@@ -378,3 +378,616 @@ uint64_t helper_fp_logb_d(CPULoongArchState *env, uint64_t fp)
     update_fcsr0(env, GETPC());
     return fp1;
 }
+
+void helper_movreg2cf_i32(CPULoongArchState *env, uint32_t cd, uint32_t src)
+{
+    env->active_fpu.cf[cd & 0x7] = src & 0x1;
+}
+
+void helper_movreg2cf_i64(CPULoongArchState *env, uint32_t cd, uint64_t src)
+{
+    env->active_fpu.cf[cd & 0x7] = src & 0x1;
+}
+
+/* fcmp.cond.s */
+uint32_t helper_fp_cmp_caf_s(CPULoongArchState *env, uint32_t fp,
+                             uint32_t fp1)
+{
+    uint64_t ret;
+    ret = (float32_unordered_quiet(fp1, fp, &env->active_fpu.fp_status), 0);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint32_t helper_fp_cmp_cun_s(CPULoongArchState *env, uint32_t fp,
+                             uint32_t fp1)
+{
+    uint64_t ret;
+    ret = float32_unordered_quiet(fp1, fp, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint32_t helper_fp_cmp_ceq_s(CPULoongArchState *env, uint32_t fp,
+                             uint32_t fp1)
+{
+    uint64_t ret;
+    ret = float32_eq_quiet(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint32_t helper_fp_cmp_cueq_s(CPULoongArchState *env, uint32_t fp,
+                              uint32_t fp1)
+{
+    uint64_t ret;
+    ret = float32_unordered_quiet(fp1, fp, &env->active_fpu.fp_status) ||
+          float32_eq_quiet(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint32_t helper_fp_cmp_clt_s(CPULoongArchState *env, uint32_t fp,
+                             uint32_t fp1)
+{
+    uint64_t ret;
+    ret = float32_lt_quiet(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint32_t helper_fp_cmp_cult_s(CPULoongArchState *env, uint32_t fp,
+                              uint32_t fp1)
+{
+    uint64_t ret;
+    ret = float32_unordered_quiet(fp1, fp, &env->active_fpu.fp_status) ||
+          float32_lt_quiet(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint32_t helper_fp_cmp_cle_s(CPULoongArchState *env, uint32_t fp,
+                             uint32_t fp1)
+{
+    uint64_t ret;
+    ret = float32_le_quiet(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint32_t helper_fp_cmp_cule_s(CPULoongArchState *env, uint32_t fp,
+                              uint32_t fp1)
+{
+    uint64_t ret;
+    ret = float32_unordered_quiet(fp1, fp, &env->active_fpu.fp_status) ||
+          float32_le_quiet(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint32_t helper_fp_cmp_cne_s(CPULoongArchState *env, uint32_t fp,
+                             uint32_t fp1)
+{
+    uint64_t ret;
+    ret = float32_lt_quiet(fp1, fp, &env->active_fpu.fp_status) ||
+          float32_lt_quiet(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint32_t helper_fp_cmp_cor_s(CPULoongArchState *env, uint32_t fp,
+                             uint32_t fp1)
+{
+    uint64_t ret;
+    ret = float32_le_quiet(fp1, fp, &env->active_fpu.fp_status) ||
+          float32_le_quiet(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint32_t helper_fp_cmp_cune_s(CPULoongArchState *env, uint32_t fp,
+                              uint32_t fp1)
+{
+    uint64_t ret;
+    ret = float32_unordered_quiet(fp1, fp, &env->active_fpu.fp_status) ||
+          float32_lt_quiet(fp1, fp, &env->active_fpu.fp_status) ||
+          float32_lt_quiet(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+
+uint32_t helper_fp_cmp_saf_s(CPULoongArchState *env, uint32_t fp,
+                             uint32_t fp1)
+{
+    uint64_t ret;
+    ret = (float32_unordered(fp1, fp, &env->active_fpu.fp_status), 0);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint32_t helper_fp_cmp_sun_s(CPULoongArchState *env, uint32_t fp,
+                             uint32_t fp1)
+{
+    uint64_t ret;
+    ret = float32_unordered(fp1, fp, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint32_t helper_fp_cmp_seq_s(CPULoongArchState *env, uint32_t fp,
+                             uint32_t fp1)
+{
+    uint64_t ret;
+    ret = float32_eq(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint32_t helper_fp_cmp_sueq_s(CPULoongArchState *env, uint32_t fp,
+                              uint32_t fp1)
+{
+    uint64_t ret;
+    ret = float32_unordered(fp1, fp, &env->active_fpu.fp_status) ||
+          float32_eq(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint32_t helper_fp_cmp_slt_s(CPULoongArchState *env, uint32_t fp,
+                             uint32_t fp1)
+{
+    uint64_t ret;
+    ret = float32_lt(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint32_t helper_fp_cmp_sult_s(CPULoongArchState *env, uint32_t fp,
+                              uint32_t fp1)
+{
+    uint64_t ret;
+    ret = float32_unordered(fp1, fp, &env->active_fpu.fp_status) ||
+          float32_lt(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint32_t helper_fp_cmp_sle_s(CPULoongArchState *env, uint32_t fp,
+                             uint32_t fp1)
+{
+    uint64_t ret;
+    ret = float32_le(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint32_t helper_fp_cmp_sule_s(CPULoongArchState *env, uint32_t fp,
+                              uint32_t fp1)
+{
+    uint64_t ret;
+    ret = float32_unordered(fp1, fp, &env->active_fpu.fp_status) ||
+          float32_le(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint32_t helper_fp_cmp_sne_s(CPULoongArchState *env, uint32_t fp,
+                             uint32_t fp1)
+{
+    uint64_t ret;
+    ret = float32_lt(fp1, fp, &env->active_fpu.fp_status) ||
+          float32_lt(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint32_t helper_fp_cmp_sor_s(CPULoongArchState *env, uint32_t fp,
+                             uint32_t fp1)
+{
+    uint64_t ret;
+    ret = float32_le(fp1, fp, &env->active_fpu.fp_status) ||
+          float32_le(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint32_t helper_fp_cmp_sune_s(CPULoongArchState *env, uint32_t fp,
+                              uint32_t fp1)
+{
+    uint64_t ret;
+    ret = float32_unordered(fp1, fp, &env->active_fpu.fp_status) ||
+          float32_lt(fp1, fp, &env->active_fpu.fp_status) ||
+          float32_lt(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+/* fcmp.cond.d */
+uint64_t helper_fp_cmp_caf_d(CPULoongArchState *env, uint64_t fp,
+                             uint64_t fp1)
+{
+    uint64_t ret;
+    ret = (float64_unordered_quiet(fp1, fp, &env->active_fpu.fp_status), 0);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_cun_d(CPULoongArchState *env, uint64_t fp,
+                             uint64_t fp1)
+{
+    uint64_t ret;
+    ret = float64_unordered_quiet(fp1, fp, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_ceq_d(CPULoongArchState *env, uint64_t fp,
+                             uint64_t fp1)
+{
+    uint64_t ret;
+    ret = float64_eq_quiet(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_cueq_d(CPULoongArchState *env, uint64_t fp,
+                              uint64_t fp1)
+{
+    uint64_t ret;
+    ret = float64_unordered_quiet(fp1, fp, &env->active_fpu.fp_status) ||
+          float64_eq_quiet(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_clt_d(CPULoongArchState *env, uint64_t fp,
+                              uint64_t fp1)
+{
+    uint64_t ret;
+    ret = float64_lt_quiet(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_cult_d(CPULoongArchState *env, uint64_t fp,
+                              uint64_t fp1)
+{
+    uint64_t ret;
+    ret = float64_unordered_quiet(fp1, fp, &env->active_fpu.fp_status) ||
+          float64_lt_quiet(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_cle_d(CPULoongArchState *env, uint64_t fp,
+                             uint64_t fp1)
+{
+    uint64_t ret;
+    ret = float64_le_quiet(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_cule_d(CPULoongArchState *env, uint64_t fp,
+                              uint64_t fp1)
+{
+    uint64_t ret;
+    ret = float64_unordered_quiet(fp1, fp, &env->active_fpu.fp_status) ||
+          float64_le_quiet(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_cne_d(CPULoongArchState *env, uint64_t fp,
+                             uint64_t fp1)
+{
+    uint64_t ret;
+    ret = float64_lt_quiet(fp1, fp, &env->active_fpu.fp_status) ||
+          float64_lt_quiet(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_cor_d(CPULoongArchState *env, uint64_t fp,
+                             uint64_t fp1)
+{
+    uint64_t ret;
+    ret = float64_le_quiet(fp1, fp, &env->active_fpu.fp_status) ||
+          float64_le_quiet(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_cune_d(CPULoongArchState *env, uint64_t fp,
+                              uint64_t fp1)
+{
+    uint64_t ret;
+    ret = float64_unordered_quiet(fp1, fp, &env->active_fpu.fp_status) ||
+          float64_lt_quiet(fp1, fp, &env->active_fpu.fp_status) ||
+          float64_lt_quiet(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_saf_d(CPULoongArchState *env, uint64_t fp,
+                             uint64_t fp1)
+{
+    uint64_t ret;
+    ret = (float64_unordered(fp1, fp, &env->active_fpu.fp_status), 0);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_sun_d(CPULoongArchState *env, uint64_t fp,
+                             uint64_t fp1)
+{
+    uint64_t ret;
+    ret = float64_unordered(fp1, fp, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_seq_d(CPULoongArchState *env, uint64_t fp,
+                             uint64_t fp1)
+{
+    uint64_t ret;
+    ret = float64_eq(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_sueq_d(CPULoongArchState *env, uint64_t fp,
+                              uint64_t fp1)
+{
+    uint64_t ret;
+    ret = float64_unordered(fp1, fp, &env->active_fpu.fp_status) ||
+          float64_eq(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_slt_d(CPULoongArchState *env, uint64_t fp,
+                             uint64_t fp1)
+{
+    uint64_t ret;
+    ret = float64_lt(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_sult_d(CPULoongArchState *env, uint64_t fp,
+                              uint64_t fp1)
+{
+    uint64_t ret;
+    ret = float64_unordered(fp1, fp, &env->active_fpu.fp_status) ||
+          float64_lt(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_sle_d(CPULoongArchState *env, uint64_t fp,
+                             uint64_t fp1)
+{
+    uint64_t ret;
+    ret = float64_le(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_sule_d(CPULoongArchState *env, uint64_t fp,
+                              uint64_t fp1)
+{
+    uint64_t ret;
+    ret = float64_unordered(fp1, fp, &env->active_fpu.fp_status) ||
+          float64_le(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_sne_d(CPULoongArchState *env, uint64_t fp,
+                             uint64_t fp1)
+{
+    uint64_t ret;
+    ret = float64_lt(fp1, fp, &env->active_fpu.fp_status) ||
+          float64_lt(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_sor_d(CPULoongArchState *env, uint64_t fp,
+                             uint64_t fp1)
+{
+    uint64_t ret;
+    ret = float64_le(fp1, fp, &env->active_fpu.fp_status) ||
+          float64_le(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+uint64_t helper_fp_cmp_sune_d(CPULoongArchState *env, uint64_t fp,
+                              uint64_t fp1)
+{
+    uint64_t ret;
+    ret = float64_unordered(fp1, fp, &env->active_fpu.fp_status) ||
+          float64_lt(fp1, fp, &env->active_fpu.fp_status) ||
+          float64_lt(fp, fp1, &env->active_fpu.fp_status);
+    update_fcsr0(env, GETPC());
+    if (ret) {
+        return -1;
+    } else {
+        return 0;
+    }
+}

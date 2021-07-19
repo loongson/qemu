@@ -4125,3 +4125,187 @@ static bool trans_fclass_d(DisasContext *ctx, arg_fclass_d *a)
 
     return true;
 }
+
+/* Floating point compare instruction translation */
+static bool trans_fcmp_cond_s(DisasContext *ctx, arg_fcmp_cond_s *a)
+{
+    TCGv_i32 fp0, fp1, fcc;
+
+    fp0 = tcg_temp_new_i32();
+    fp1 = tcg_temp_new_i32();
+    fcc = tcg_const_i32(a->cd);
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr32(fp0, a->fj);
+    gen_load_fpr32(fp1, a->fk);
+
+    switch (a->fcond) {
+    case  0:
+        gen_helper_fp_cmp_caf_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case  1:
+        gen_helper_fp_cmp_saf_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case  2:
+        gen_helper_fp_cmp_clt_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case  3:
+        gen_helper_fp_cmp_slt_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case  4:
+        gen_helper_fp_cmp_ceq_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case  5:
+        gen_helper_fp_cmp_seq_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case  6:
+        gen_helper_fp_cmp_cle_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case  7:
+        gen_helper_fp_cmp_sle_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case  8:
+        gen_helper_fp_cmp_cun_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case  9:
+        gen_helper_fp_cmp_sun_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case 10:
+        gen_helper_fp_cmp_cult_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case 11:
+        gen_helper_fp_cmp_sult_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case 12:
+        gen_helper_fp_cmp_cueq_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case 13:
+        gen_helper_fp_cmp_sueq_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case 14:
+        gen_helper_fp_cmp_cule_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case 15:
+        gen_helper_fp_cmp_sule_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case 16:
+        gen_helper_fp_cmp_cne_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case 17:
+        gen_helper_fp_cmp_sne_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case 20:
+        gen_helper_fp_cmp_cor_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case 21:
+        gen_helper_fp_cmp_sor_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case 24:
+        gen_helper_fp_cmp_cune_s(fp0, cpu_env, fp0, fp1);
+        break;
+    case 25:
+        gen_helper_fp_cmp_sune_s(fp0, cpu_env, fp0, fp1);
+        break;
+    default:
+        abort();
+    }
+    gen_helper_movreg2cf_i32(cpu_env, fcc, fp0);
+
+    tcg_temp_free_i32(fp0);
+    tcg_temp_free_i32(fp1);
+    tcg_temp_free_i32(fcc);
+
+    return true;
+}
+
+static bool trans_fcmp_cond_d(DisasContext *ctx, arg_fcmp_cond_d *a)
+{
+    TCGv_i64 fp0, fp1;
+    TCGv_i32 fcc;
+
+    fp0 = tcg_temp_new_i64();
+    fp1 = tcg_temp_new_i64();
+    fcc = tcg_const_i32(a->cd);
+
+    gen_load_fpr64(fp0, a->fj);
+    gen_load_fpr64(fp1, a->fk);
+
+    check_fpu_enabled(ctx);
+    switch (a->fcond) {
+    case  0:
+        gen_helper_fp_cmp_caf_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case  1:
+        gen_helper_fp_cmp_saf_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case  2:
+        gen_helper_fp_cmp_clt_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case  3:
+        gen_helper_fp_cmp_slt_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case  4:
+        gen_helper_fp_cmp_ceq_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case  5:
+        gen_helper_fp_cmp_seq_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case  6:
+        gen_helper_fp_cmp_cle_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case  7:
+        gen_helper_fp_cmp_sle_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case  8:
+        gen_helper_fp_cmp_cun_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case  9:
+        gen_helper_fp_cmp_sun_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case 10:
+        gen_helper_fp_cmp_cult_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case 11:
+        gen_helper_fp_cmp_sult_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case 12:
+        gen_helper_fp_cmp_cueq_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case 13:
+        gen_helper_fp_cmp_sueq_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case 14:
+        gen_helper_fp_cmp_cule_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case 15:
+        gen_helper_fp_cmp_sule_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case 16:
+        gen_helper_fp_cmp_cne_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case 17:
+        gen_helper_fp_cmp_sne_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case 20:
+        gen_helper_fp_cmp_cor_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case 21:
+        gen_helper_fp_cmp_sor_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case 24:
+        gen_helper_fp_cmp_cune_d(fp0, cpu_env, fp0, fp1);
+        break;
+    case 25:
+        gen_helper_fp_cmp_sune_d(fp0, cpu_env, fp0, fp1);
+        break;
+    default:
+        abort();
+    }
+    gen_helper_movreg2cf_i64(cpu_env, fcc, fp0);
+
+    tcg_temp_free_i64(fp0);
+    tcg_temp_free_i64(fp1);
+    tcg_temp_free_i32(fcc);
+
+    return true;
+}
