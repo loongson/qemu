@@ -379,6 +379,11 @@ uint64_t helper_fp_logb_d(CPULoongArchState *env, uint64_t fp)
     return fp1;
 }
 
+void helper_movreg2cf(CPULoongArchState *env, uint32_t cd, target_ulong src)
+{
+    env->active_fpu.cf[cd & 0x7] = src & 0x1;
+}
+
 void helper_movreg2cf_i32(CPULoongArchState *env, uint32_t cd, uint32_t src)
 {
     env->active_fpu.cf[cd & 0x7] = src & 0x1;
@@ -1352,4 +1357,79 @@ uint64_t helper_fp_rint_d(CPULoongArchState *env, uint64_t src)
     dest = float64_round_to_int(src, &env->active_fpu.fp_status);
     update_fcsr0(env, GETPC());
     return dest;
+}
+
+target_ulong helper_fsel(CPULoongArchState *env, target_ulong fj,
+                         target_ulong fk, uint32_t ca)
+{
+    if (env->active_fpu.cf[ca & 0x7]) {
+        return fk;
+    } else {
+        return fj;
+    }
+}
+
+void helper_movgr2fcsr(CPULoongArchState *env, target_ulong arg1,
+                       uint32_t fcsr)
+{
+    switch (fcsr) {
+    case 0:
+        env->active_fpu.fcsr0 = arg1;
+        break;
+    case 1:
+        env->active_fpu.fcsr0 = (arg1 & FCSR0_M1) |
+                                (env->active_fpu.fcsr0 & ~FCSR0_M1);
+        break;
+    case 2:
+        env->active_fpu.fcsr0 = (arg1 & FCSR0_M2) |
+                                (env->active_fpu.fcsr0 & ~FCSR0_M2);
+        break;
+    case 3:
+        env->active_fpu.fcsr0 = (arg1 & FCSR0_M3) |
+                                (env->active_fpu.fcsr0 & ~FCSR0_M3);
+        break;
+    case 16:
+        env->active_fpu.vcsr16 = arg1;
+        break;
+    default:
+        printf("%s: warning, fcsr '%d' not supported\n", __func__, fcsr);
+        assert(0);
+        break;
+    }
+    restore_fp_status(env);
+    set_float_exception_flags(0, &env->active_fpu.fp_status);
+}
+
+target_ulong helper_movfcsr2gr(CPULoongArchState *env, uint32_t reg)
+{
+    target_ulong r = 0;
+
+    switch (reg) {
+    case 0:
+        r = (uint32_t)env->active_fpu.fcsr0;
+        break;
+    case 1:
+        r = (env->active_fpu.fcsr0 & FCSR0_M1);
+        break;
+    case 2:
+        r = (env->active_fpu.fcsr0 & FCSR0_M2);
+        break;
+    case 3:
+        r = (env->active_fpu.fcsr0 & FCSR0_M3);
+        break;
+    case 16:
+        r = (uint32_t)env->active_fpu.vcsr16;
+        break;
+    default:
+        printf("%s: warning, fcsr '%d' not supported\n", __func__, reg);
+        assert(0);
+        break;
+    }
+
+    return r;
+}
+
+target_ulong helper_movcf2reg(CPULoongArchState *env, uint32_t cj)
+{
+    return (target_ulong)env->active_fpu.cf[cj & 0x7];
 }
