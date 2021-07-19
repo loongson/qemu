@@ -4309,3 +4309,452 @@ static bool trans_fcmp_cond_d(DisasContext *ctx, arg_fcmp_cond_d *a)
 
     return true;
 }
+
+/* Floating point conversion instruction */
+static bool trans_fcvt_s_d(DisasContext *ctx, arg_fcvt_s_d *a)
+{
+    TCGv_i32 fp32 = tcg_temp_new_i32();
+    TCGv_i64 fp64 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr64(fp64, a->fj);
+    gen_helper_fp_cvt_s_d(fp32, cpu_env, fp64);
+    gen_store_fpr32(fp32, a->fd);
+
+    tcg_temp_free_i32(fp32);
+    tcg_temp_free_i64(fp64);
+
+    return true;
+}
+
+static bool trans_fcvt_d_s(DisasContext *ctx, arg_fcvt_d_s *a)
+{
+    TCGv_i32 fp32 = tcg_temp_new_i32();
+    TCGv_i64 fp64 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr32(fp32, a->fj);
+    gen_helper_fp_cvt_d_s(fp64, cpu_env, fp32);
+    gen_store_fpr64(fp64, a->fd);
+
+    tcg_temp_free_i32(fp32);
+    tcg_temp_free_i64(fp64);
+
+    return true;
+}
+
+static bool trans_ftintrm_w_s(DisasContext *ctx, arg_ftintrm_l_s *a)
+{
+    TCGv_i32 fp0;
+
+    fp0 = tcg_temp_new_i32();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr32(fp0, a->fj);
+    gen_helper_fp_tintrm_w_s(fp0, cpu_env, fp0);
+    gen_store_fpr32(fp0, a->fd);
+
+    tcg_temp_free_i32(fp0);
+
+    return true;
+}
+
+static bool trans_ftintrm_w_d(DisasContext *ctx, arg_ftintrm_l_d *a)
+{
+    TCGv_i32 fp32 = tcg_temp_new_i32();
+    TCGv_i64 fp64 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr64(fp64, a->fj);
+    gen_helper_fp_tintrm_w_d(fp32, cpu_env, fp64);
+    gen_store_fpr32(fp32, a->fd);
+
+    tcg_temp_free_i32(fp32);
+    tcg_temp_free_i64(fp64);
+
+    return true;
+}
+
+static bool trans_ftintrm_l_s(DisasContext *ctx, arg_ftintrm_l_s *a)
+{
+    TCGv_i32 fp32 = tcg_temp_new_i32();
+    TCGv_i64 fp64 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr32(fp32, a->fj);
+    gen_helper_fp_tintrm_l_s(fp64, cpu_env, fp32);
+    gen_store_fpr64(fp64, a->fd);
+
+    tcg_temp_free_i32(fp32);
+    tcg_temp_free_i64(fp64);
+
+    return true;
+}
+
+static bool trans_ftintrm_l_d(DisasContext *ctx, arg_ftintrm_l_d *a)
+{
+    TCGv_i64 fp0;
+
+    fp0 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr64(fp0, a->fj);
+    gen_helper_fp_tintrm_l_d(fp0, cpu_env, fp0);
+    gen_store_fpr64(fp0, a->fd);
+
+    tcg_temp_free_i64(fp0);
+
+    return true;
+}
+
+static bool trans_ftintrp_w_s(DisasContext *ctx, arg_ftintrp_w_s *a)
+{
+    TCGv_i32 fp0;
+
+    fp0 = tcg_temp_new_i32();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr32(fp0, a->fj);
+    gen_helper_fp_tintrp_w_s(fp0, cpu_env, fp0);
+    gen_store_fpr32(fp0, a->fd);
+
+    tcg_temp_free_i32(fp0);
+
+    return true;
+}
+
+static bool trans_ftintrp_w_d(DisasContext *ctx, arg_ftintrp_w_d *a)
+{
+    TCGv_i32 fp32 = tcg_temp_new_i32();
+    TCGv_i64 fp64 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr64(fp64, a->fj);
+    gen_helper_fp_tintrp_w_d(fp32, cpu_env, fp64);
+    gen_store_fpr32(fp32, a->fd);
+
+    tcg_temp_free_i32(fp32);
+    tcg_temp_free_i64(fp64);
+
+    return true;
+}
+
+static bool trans_ftintrp_l_s(DisasContext *ctx, arg_ftintrp_l_s *a)
+{
+    TCGv_i32 fp32 = tcg_temp_new_i32();
+    TCGv_i64 fp64 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr32(fp32, a->fj);
+    gen_helper_fp_tintrp_l_s(fp64, cpu_env, fp32);
+    gen_store_fpr64(fp64, a->fd);
+
+    tcg_temp_free_i32(fp32);
+    tcg_temp_free_i64(fp64);
+
+    return true;
+}
+
+static bool trans_ftintrp_l_d(DisasContext *ctx, arg_ftintrp_l_d *a)
+{
+    TCGv_i64 fp0;
+
+    fp0  = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr64(fp0, a->fj);
+    gen_helper_fp_tintrp_l_d(fp0, cpu_env, fp0);
+    gen_store_fpr64(fp0, a->fd);
+
+    tcg_temp_free_i64(fp0);
+
+    return true;
+}
+
+static bool trans_ftintrz_w_s(DisasContext *ctx, arg_ftintrz_w_s *a)
+{
+    TCGv_i32 fp0;
+
+    fp0 = tcg_temp_new_i32();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr32(fp0, a->fj);
+    gen_helper_fp_tintrz_w_s(fp0, cpu_env, fp0);
+    gen_store_fpr32(fp0, a->fd);
+
+    tcg_temp_free_i32(fp0);
+
+    return true;
+}
+
+static bool trans_ftintrz_w_d(DisasContext *ctx, arg_ftintrz_w_d *a)
+{
+    TCGv_i32 fp32 = tcg_temp_new_i32();
+    TCGv_i64 fp64 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr64(fp64, a->fj);
+    gen_helper_fp_tintrz_w_d(fp32, cpu_env, fp64);
+    gen_store_fpr32(fp32, a->fd);
+
+    tcg_temp_free_i32(fp32);
+    tcg_temp_free_i64(fp64);
+
+    return true;
+}
+
+static bool trans_ftintrz_l_s(DisasContext *ctx, arg_ftintrz_l_s *a)
+{
+    TCGv_i32 fp32 = tcg_temp_new_i32();
+    TCGv_i64 fp64 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr32(fp32, a->fj);
+    gen_helper_fp_tintrz_l_s(fp64, cpu_env, fp32);
+    gen_store_fpr64(fp64, a->fd);
+
+    tcg_temp_free_i32(fp32);
+    tcg_temp_free_i64(fp64);
+
+    return true;
+}
+
+static bool trans_ftintrz_l_d(DisasContext *ctx, arg_ftintrz_l_d *a)
+{
+    TCGv_i64 fp0;
+
+    fp0 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr64(fp0, a->fj);
+    gen_helper_fp_tintrz_l_d(fp0, cpu_env, fp0);
+    gen_store_fpr64(fp0, a->fd);
+
+    tcg_temp_free_i64(fp0);
+
+    return true;
+}
+
+static bool trans_ftintrne_w_s(DisasContext *ctx, arg_ftintrne_w_s *a)
+{
+    TCGv_i32 fp0;
+
+    fp0 = tcg_temp_new_i32();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr32(fp0, a->fj);
+    gen_helper_fp_tintrne_w_s(fp0, cpu_env, fp0);
+    gen_store_fpr32(fp0, a->fd);
+
+    tcg_temp_free_i32(fp0);
+
+    return true;
+}
+
+static bool trans_ftintrne_w_d(DisasContext *ctx, arg_ftintrne_w_d *a)
+{
+    TCGv_i32 fp32 = tcg_temp_new_i32();
+    TCGv_i64 fp64 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr64(fp64, a->fj);
+    gen_helper_fp_tintrne_w_d(fp32, cpu_env, fp64);
+    gen_store_fpr32(fp32, a->fd);
+
+    tcg_temp_free_i32(fp32);
+    tcg_temp_free_i64(fp64);
+
+    return true;
+}
+
+static bool trans_ftintrne_l_s(DisasContext *ctx, arg_ftintrne_l_s *a)
+{
+    TCGv_i32 fp32 = tcg_temp_new_i32();
+    TCGv_i64 fp64 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr32(fp32, a->fj);
+    gen_helper_fp_tintrne_l_s(fp64, cpu_env, fp32);
+    gen_store_fpr64(fp64, a->fd);
+
+    tcg_temp_free_i32(fp32);
+    tcg_temp_free_i64(fp64);
+
+    return true;
+}
+
+static bool trans_ftintrne_l_d(DisasContext *ctx, arg_ftintrne_l_d *a)
+{
+    TCGv_i64 fp0;
+
+    fp0 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr64(fp0, a->fj);
+    gen_helper_fp_tintrne_l_d(fp0, cpu_env, fp0);
+    gen_store_fpr64(fp0, a->fd);
+
+    tcg_temp_free_i64(fp0);
+
+    return true;
+}
+
+static bool trans_ftint_w_s(DisasContext *ctx, arg_ftint_w_s *a)
+{
+    TCGv_i32 fp0;
+
+    fp0 = tcg_temp_new_i32();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr32(fp0, a->fj);
+    gen_helper_fp_tint_w_s(fp0, cpu_env, fp0);
+    gen_store_fpr32(fp0, a->fd);
+
+    tcg_temp_free_i32(fp0);
+
+    return true;
+}
+
+static bool trans_ftint_w_d(DisasContext *ctx, arg_ftint_w_d *a)
+{
+    TCGv_i32 fp32 = tcg_temp_new_i32();
+    TCGv_i64 fp64 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr64(fp64, a->fj);
+    gen_helper_fp_tint_w_d(fp32, cpu_env, fp64);
+    gen_store_fpr32(fp32, a->fd);
+
+    tcg_temp_free_i32(fp32);
+    tcg_temp_free_i64(fp64);
+
+    return true;
+}
+
+static bool trans_ftint_l_s(DisasContext *ctx, arg_ftint_l_s *a)
+{
+    TCGv_i32 fp32 = tcg_temp_new_i32();
+    TCGv_i64 fp64 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr32(fp32, a->fj);
+    gen_helper_fp_tint_l_s(fp64, cpu_env, fp32);
+    gen_store_fpr64(fp64, a->fd);
+
+    tcg_temp_free_i32(fp32);
+    tcg_temp_free_i64(fp64);
+
+    return true;
+}
+
+static bool trans_ftint_l_d(DisasContext *ctx, arg_ftint_l_d *a)
+{
+    TCGv_i64 fp0;
+
+    fp0 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr64(fp0, a->fj);
+    gen_helper_fp_tint_l_d(fp0, cpu_env, fp0);
+    gen_store_fpr64(fp0, a->fd);
+
+    tcg_temp_free_i64(fp0);
+
+    return true;
+}
+
+static bool trans_ffint_s_w(DisasContext *ctx, arg_ffint_s_w *a)
+{
+    TCGv_i32 fp0;
+
+    fp0 = tcg_temp_new_i32();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr32(fp0, a->fj);
+    gen_helper_fp_fint_s_w(fp0, cpu_env, fp0);
+    gen_store_fpr32(fp0, a->fd);
+
+    tcg_temp_free_i32(fp0);
+
+    return true;
+}
+
+static bool trans_ffint_s_l(DisasContext *ctx, arg_ffint_s_l *a)
+{
+    TCGv_i32 fp32 = tcg_temp_new_i32();
+    TCGv_i64 fp64 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr64(fp64, a->fj);
+    gen_helper_fp_fint_s_l(fp32, cpu_env, fp64);
+    gen_store_fpr32(fp32, a->fd);
+
+    tcg_temp_free_i32(fp32);
+    tcg_temp_free_i64(fp64);
+
+    return true;
+}
+
+static bool trans_ffint_d_w(DisasContext *ctx, arg_ffint_d_w *a)
+{
+    TCGv_i32 fp32 = tcg_temp_new_i32();
+    TCGv_i64 fp64 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr32(fp32, a->fj);
+    gen_helper_fp_fint_d_w(fp64, cpu_env, fp32);
+    gen_store_fpr64(fp64, a->fd);
+
+    tcg_temp_free_i32(fp32);
+    tcg_temp_free_i64(fp64);
+
+    return true;
+}
+
+static bool trans_ffint_d_l(DisasContext *ctx, arg_ffint_d_l *a)
+{
+    TCGv_i64 fp0;
+
+    fp0 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr64(fp0, a->fj);
+    gen_helper_fp_fint_d_l(fp0, cpu_env, fp0);
+    gen_store_fpr64(fp0, a->fd);
+
+    tcg_temp_free_i64(fp0);
+
+    return true;
+}
+
+static bool trans_frint_s(DisasContext *ctx, arg_frint_s *a)
+{
+    TCGv_i32 fp0;
+
+    fp0 = tcg_temp_new_i32();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr32(fp0, a->fj);
+    gen_helper_fp_rint_s(fp0, cpu_env, fp0);
+    gen_store_fpr32(fp0, a->fd);
+
+    tcg_temp_free_i32(fp0);
+
+    return true;
+}
+
+static bool trans_frint_d(DisasContext *ctx, arg_frint_d *a)
+{
+    TCGv_i64 fp0;
+
+    fp0 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_load_fpr64(fp0, a->fj);
+    gen_helper_fp_rint_d(fp0, cpu_env, fp0);
+    gen_store_fpr64(fp0, a->fd);
+
+    tcg_temp_free_i64(fp0);
+
+    return true;
+}
