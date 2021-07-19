@@ -306,6 +306,38 @@ static void gen_loongarch_sync(int stype)
     tcg_gen_mb(tcg_mo);
 }
 
+/* loongarch st cond */
+static void gen_loongarch_st_cond(DisasContext *ctx, int rd, int base,
+                                  int offset, MemOp tcg_mo, bool eva)
+{
+    TCGv Rd = cpu_gpr[rd];
+    TCGv t0 = tcg_temp_new();
+    TCGv addr = tcg_temp_new();
+    TCGv val = tcg_temp_new();
+    TCGLabel *l1 = gen_new_label();
+    TCGLabel *done = gen_new_label();
+
+    /* compare the address against that of the preceding LL */
+    gen_base_offset_addr(addr, base, offset);
+    tcg_gen_brcond_tl(TCG_COND_EQ, addr, cpu_lladdr, l1);
+    tcg_gen_movi_tl(t0, 0);
+    tcg_gen_mov_tl(Rd, t0);
+    tcg_gen_br(done);
+
+    gen_set_label(l1);
+    /* generate cmpxchg */
+    gen_load_gpr(val, rd);
+    tcg_gen_atomic_cmpxchg_tl(t0, cpu_lladdr, cpu_llval, val,
+                              eva ? LOONGARCH_HFLAG_UM : ctx->mem_idx, tcg_mo);
+    tcg_gen_setcond_tl(TCG_COND_EQ, t0, t0, cpu_llval);
+    tcg_gen_mov_tl(Rd, t0);
+
+    gen_set_label(done);
+    tcg_temp_free(t0);
+    tcg_temp_free(addr);
+    tcg_temp_free(val);
+}
+
 static void loongarch_tr_tb_start(DisasContextBase *dcbase, CPUState *cs)
 {
 }

@@ -2874,3 +2874,213 @@ static bool trans_stle_d(DisasContext *ctx, arg_stle_d *a)
 }
 
 #undef DECL_ARG
+
+/* Fixed point atomic instruction translation */
+static bool trans_ll_w(DisasContext *ctx, arg_ll_w *a)
+{
+    TCGv t0, t1;
+    TCGv Rd = cpu_gpr[a->rd];
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_base_offset_addr(t0, a->rj, a->si14 << 2);
+    tcg_gen_mov_tl(t1, t0);
+    tcg_gen_qemu_ld32s(t0, t0, ctx->mem_idx);
+    tcg_gen_st_tl(t1, cpu_env, offsetof(CPULoongArchState, lladdr));
+    tcg_gen_st_tl(t0, cpu_env, offsetof(CPULoongArchState, llval));
+    tcg_gen_mov_tl(Rd, t0);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_sc_w(DisasContext *ctx, arg_sc_w *a)
+{
+    gen_loongarch_st_cond(ctx, a->rd, a->rj, a->si14 << 2, MO_TESL, false);
+    return true;
+}
+
+static bool trans_ll_d(DisasContext *ctx, arg_ll_d *a)
+{
+    TCGv t0, t1;
+    TCGv Rd = cpu_gpr[a->rd];
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_base_offset_addr(t0, a->rj, a->si14 << 2);
+    tcg_gen_mov_tl(t1, t0);
+    tcg_gen_qemu_ld64(t0, t0, ctx->mem_idx);
+    tcg_gen_st_tl(t1, cpu_env, offsetof(CPULoongArchState, lladdr));
+    tcg_gen_st_tl(t0, cpu_env, offsetof(CPULoongArchState, llval));
+    tcg_gen_mov_tl(Rd, t0);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_sc_d(DisasContext *ctx, arg_sc_d *a)
+{
+    gen_loongarch_st_cond(ctx, a->rd, a->rj, a->si14 << 2, MO_TEQ, false);
+    return true;
+}
+
+#define TRANS_AM_W(name, op)                                      \
+static bool trans_ ## name(DisasContext *ctx, arg_ ## name * a)   \
+{                                                                 \
+    TCGv addr, val, ret;                                          \
+    TCGv Rd = cpu_gpr[a->rd];                                     \
+    int mem_idx = ctx->mem_idx;                                   \
+                                                                  \
+    if (a->rd == 0) {                                             \
+        return true;                                              \
+    }                                                             \
+    if ((a->rd != 0) && ((a->rj == a->rd) || (a->rk == a->rd))) { \
+        printf("%s: warning, register equal\n", __func__);        \
+        return false;                                             \
+    }                                                             \
+                                                                  \
+    addr = get_gpr(a->rj);                                        \
+    val = get_gpr(a->rk);                                         \
+    ret = tcg_temp_new();                                         \
+                                                                  \
+    tcg_gen_atomic_##op##_tl(ret, addr, val, mem_idx, MO_TESL |   \
+                            ctx->default_tcg_memop_mask);         \
+    tcg_gen_mov_tl(Rd, ret);                                      \
+                                                                  \
+    tcg_temp_free(ret);                                           \
+                                                                  \
+    return true;                                                  \
+}
+#define TRANS_AM_D(name, op)                                      \
+static bool trans_ ## name(DisasContext *ctx, arg_ ## name * a)   \
+{                                                                 \
+    TCGv addr, val, ret;                                          \
+    TCGv Rd = cpu_gpr[a->rd];                                     \
+    int mem_idx = ctx->mem_idx;                                   \
+                                                                  \
+    if (a->rd == 0) {                                             \
+        return true;                                              \
+    }                                                             \
+    if ((a->rd != 0) && ((a->rj == a->rd) || (a->rk == a->rd))) { \
+        printf("%s: warning, register equal\n", __func__);        \
+        return false;                                             \
+    }                                                             \
+    addr = get_gpr(a->rj);                                        \
+    val = get_gpr(a->rk);                                         \
+    ret = tcg_temp_new();                                         \
+                                                                  \
+    tcg_gen_atomic_##op##_tl(ret, addr, val, mem_idx, MO_TEQ |    \
+                            ctx->default_tcg_memop_mask);         \
+    tcg_gen_mov_tl(Rd, ret);                                      \
+                                                                  \
+    tcg_temp_free(ret);                                           \
+                                                                  \
+    return true;                                                  \
+}
+#define TRANS_AM(name, op)   \
+    TRANS_AM_W(name##_w, op) \
+    TRANS_AM_D(name##_d, op)
+TRANS_AM(amswap, xchg)      /* trans_amswap_w, trans_amswap_d */
+TRANS_AM(amadd, fetch_add)  /* trans_amadd_w, trans_amadd_d   */
+TRANS_AM(amand, fetch_and)  /* trans_amand_w, trans_amand_d   */
+TRANS_AM(amor, fetch_or)    /* trans_amor_w, trans_amor_d     */
+TRANS_AM(amxor, fetch_xor)  /* trans_amxor_w, trans_amxor_d   */
+TRANS_AM(ammax, fetch_smax) /* trans_ammax_w, trans_ammax_d   */
+TRANS_AM(ammin, fetch_smin) /* trans_ammin_w, trans_ammin_d   */
+TRANS_AM_W(ammax_wu, fetch_umax)    /* trans_ammax_wu */
+TRANS_AM_D(ammax_du, fetch_umax)    /* trans_ammax_du */
+TRANS_AM_W(ammin_wu, fetch_umin)    /* trans_ammin_wu */
+TRANS_AM_D(ammin_du, fetch_umin)    /* trans_ammin_du */
+#undef TRANS_AM
+#undef TRANS_AM_W
+#undef TRANS_AM_D
+
+#define TRANS_AM_DB_W(name, op)                                   \
+static bool trans_ ## name(DisasContext *ctx, arg_ ## name * a)   \
+{                                                                 \
+    TCGv addr, val, ret;                                          \
+    TCGv Rd = cpu_gpr[a->rd];                                     \
+    int mem_idx = ctx->mem_idx;                                   \
+                                                                  \
+    if (a->rd == 0) {                                             \
+        return true;                                              \
+    }                                                             \
+    if ((a->rd != 0) && ((a->rj == a->rd) || (a->rk == a->rd))) { \
+        printf("%s: warning, register equal\n", __func__);        \
+        return false;                                             \
+    }                                                             \
+                                                                  \
+    addr = get_gpr(a->rj);                                        \
+    val = get_gpr(a->rk);                                         \
+    ret = tcg_temp_new();                                         \
+                                                                  \
+    gen_loongarch_sync(0x10);                                     \
+    tcg_gen_atomic_##op##_tl(ret, addr, val, mem_idx, MO_TESL |   \
+                            ctx->default_tcg_memop_mask);         \
+    tcg_gen_mov_tl(Rd, ret);                                      \
+                                                                  \
+    tcg_temp_free(ret);                                           \
+                                                                  \
+    return true;                                                  \
+}
+#define TRANS_AM_DB_D(name, op)                                   \
+static bool trans_ ## name(DisasContext *ctx, arg_ ## name * a)   \
+{                                                                 \
+    TCGv addr, val, ret;                                          \
+    TCGv Rd = cpu_gpr[a->rd];                                     \
+    int mem_idx = ctx->mem_idx;                                   \
+                                                                  \
+    if (a->rd == 0) {                                             \
+        return true;                                              \
+    }                                                             \
+    if ((a->rd != 0) && ((a->rj == a->rd) || (a->rk == a->rd))) { \
+        printf("%s: warning, register equal\n", __func__);        \
+        return false;                                             \
+    }                                                             \
+                                                                  \
+    addr = get_gpr(a->rj);                                        \
+    val = get_gpr(a->rk);                                         \
+    ret = tcg_temp_new();                                         \
+                                                                  \
+    gen_loongarch_sync(0x10);                                     \
+    tcg_gen_atomic_##op##_tl(ret, addr, val, mem_idx, MO_TEQ |    \
+                            ctx->default_tcg_memop_mask);         \
+    tcg_gen_mov_tl(Rd, ret);                                      \
+                                                                  \
+    tcg_temp_free(ret);                                           \
+                                                                  \
+    return true;                                                  \
+}
+#define TRANS_AM_DB(name, op)      \
+    TRANS_AM_DB_W(name##_db_w, op) \
+    TRANS_AM_DB_D(name##_db_d, op)
+TRANS_AM_DB(amswap, xchg)      /* trans_amswap_db_w, trans_amswap_db_d */
+TRANS_AM_DB(amadd, fetch_add)  /* trans_amadd_db_w, trans_amadd_db_d   */
+TRANS_AM_DB(amand, fetch_and)  /* trans_amand_db_w, trans_amand_db_d   */
+TRANS_AM_DB(amor, fetch_or)    /* trans_amor_db_w, trans_amor_db_d     */
+TRANS_AM_DB(amxor, fetch_xor)  /* trans_amxor_db_w, trans_amxor_db_d   */
+TRANS_AM_DB(ammax, fetch_smax) /* trans_ammax_db_w, trans_ammax_db_d   */
+TRANS_AM_DB(ammin, fetch_smin) /* trans_ammin_db_w, trans_ammin_db_d   */
+TRANS_AM_DB_W(ammax_db_wu, fetch_umax)    /* trans_ammax_db_wu */
+TRANS_AM_DB_D(ammax_db_du, fetch_umax)    /* trans_ammax_db_du */
+TRANS_AM_DB_W(ammin_db_wu, fetch_umin)    /* trans_ammin_db_wu */
+TRANS_AM_DB_D(ammin_db_du, fetch_umin)    /* trans_ammin_db_du */
+#undef TRANS_AM_DB
+#undef TRANS_AM_DB_W
+#undef TRANS_AM_DB_D
