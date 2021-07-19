@@ -269,6 +269,7 @@ static struct TCGCPUOps loongarch_tcg_ops = {
     .initialize = loongarch_tcg_init,
     .synchronize_from_tb = loongarch_cpu_synchronize_from_tb,
     .cpu_exec_interrupt = loongarch_cpu_exec_interrupt,
+    .tlb_fill = loongarch_cpu_tlb_fill,
 };
 #endif /* CONFIG_TCG */
 
