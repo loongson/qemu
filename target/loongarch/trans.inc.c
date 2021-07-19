@@ -2116,3 +2116,761 @@ static bool trans_bstrpick_w(DisasContext *ctx, arg_bstrpick_w *a)
 
     return true;
 }
+
+/* Fixed point load/store instruction translation */
+static bool trans_ld_b(DisasContext *ctx, arg_ld_b *a)
+{
+    TCGv t0;
+    TCGv Rd = cpu_gpr[a->rd];
+    int mem_idx = ctx->mem_idx;
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = tcg_temp_new();
+
+    gen_base_offset_addr(t0, a->rj, a->si12);
+    tcg_gen_qemu_ld_tl(t0, t0, mem_idx, MO_SB);
+    tcg_gen_mov_tl(Rd, t0);
+
+    tcg_temp_free(t0);
+
+    return true;
+}
+
+static bool trans_ld_h(DisasContext *ctx, arg_ld_h *a)
+{
+    TCGv t0;
+    TCGv Rd = cpu_gpr[a->rd];
+    int mem_idx = ctx->mem_idx;
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = tcg_temp_new();
+    gen_base_offset_addr(t0, a->rj, a->si12);
+    tcg_gen_qemu_ld_tl(t0, t0, mem_idx, MO_TESW |
+                       ctx->default_tcg_memop_mask);
+    tcg_gen_mov_tl(Rd, t0);
+
+    tcg_temp_free(t0);
+
+    return true;
+}
+
+static bool trans_ld_w(DisasContext *ctx, arg_ld_w *a)
+{
+    TCGv t0;
+    TCGv Rd = cpu_gpr[a->rd];
+    int mem_idx = ctx->mem_idx;
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = tcg_temp_new();
+    gen_base_offset_addr(t0, a->rj, a->si12);
+    tcg_gen_qemu_ld_tl(t0, t0, mem_idx, MO_TESL |
+                       ctx->default_tcg_memop_mask);
+    tcg_gen_mov_tl(Rd, t0);
+
+    tcg_temp_free(t0);
+
+    return true;
+}
+
+static bool trans_ld_d(DisasContext *ctx, arg_ld_d *a)
+{
+    TCGv t0;
+    TCGv Rd = cpu_gpr[a->rd];
+    int mem_idx = ctx->mem_idx;
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = tcg_temp_new();
+    gen_base_offset_addr(t0, a->rj, a->si12);
+    tcg_gen_qemu_ld_tl(t0, t0, mem_idx, MO_TEQ |
+                       ctx->default_tcg_memop_mask);
+    tcg_gen_mov_tl(Rd, t0);
+
+    tcg_temp_free(t0);
+
+    return true;
+}
+
+static bool trans_st_b(DisasContext *ctx, arg_st_b *a)
+{
+    TCGv t0, t1;
+    int mem_idx = ctx->mem_idx;
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_base_offset_addr(t0, a->rj, a->si12);
+    gen_load_gpr(t1, a->rd);
+    tcg_gen_qemu_st_tl(t1, t0, mem_idx, MO_8);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_st_h(DisasContext *ctx, arg_st_h *a)
+{
+    TCGv t0, t1;
+    int mem_idx = ctx->mem_idx;
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_base_offset_addr(t0, a->rj, a->si12);
+    gen_load_gpr(t1, a->rd);
+    tcg_gen_qemu_st_tl(t1, t0, mem_idx, MO_TEUW |
+                       ctx->default_tcg_memop_mask);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_st_w(DisasContext *ctx, arg_st_w *a)
+{
+    TCGv t0, t1;
+    int mem_idx = ctx->mem_idx;
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_base_offset_addr(t0, a->rj, a->si12);
+    gen_load_gpr(t1, a->rd);
+    tcg_gen_qemu_st_tl(t1, t0, mem_idx, MO_TEUL |
+                       ctx->default_tcg_memop_mask);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_st_d(DisasContext *ctx, arg_st_d *a)
+{
+    TCGv t0, t1;
+    int mem_idx = ctx->mem_idx;
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_base_offset_addr(t0, a->rj, a->si12);
+    gen_load_gpr(t1, a->rd);
+    tcg_gen_qemu_st_tl(t1, t0, mem_idx, MO_TEQ |
+                       ctx->default_tcg_memop_mask);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+static bool trans_ld_bu(DisasContext *ctx, arg_ld_bu *a)
+{
+    TCGv t0;
+    TCGv Rd = cpu_gpr[a->rd];
+    int mem_idx = ctx->mem_idx;
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = tcg_temp_new();
+
+    gen_base_offset_addr(t0, a->rj, a->si12);
+    tcg_gen_qemu_ld_tl(t0, t0, mem_idx, MO_UB);
+    tcg_gen_mov_tl(Rd, t0);
+
+    tcg_temp_free(t0);
+
+    return true;
+}
+
+static bool trans_ld_hu(DisasContext *ctx, arg_ld_hu *a)
+{
+    TCGv t0;
+    TCGv Rd = cpu_gpr[a->rd];
+    int mem_idx = ctx->mem_idx;
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = tcg_temp_new();
+
+    gen_base_offset_addr(t0, a->rj, a->si12);
+    tcg_gen_qemu_ld_tl(t0, t0, mem_idx, MO_TEUW |
+                       ctx->default_tcg_memop_mask);
+    tcg_gen_mov_tl(Rd, t0);
+
+    tcg_temp_free(t0);
+
+    return true;
+}
+
+static bool trans_ld_wu(DisasContext *ctx, arg_ld_wu *a)
+{
+    TCGv t0;
+    TCGv Rd = cpu_gpr[a->rd];
+    int mem_idx = ctx->mem_idx;
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = tcg_temp_new();
+
+    gen_base_offset_addr(t0, a->rj, a->si12);
+    tcg_gen_qemu_ld_tl(t0, t0, mem_idx, MO_TEUL |
+                       ctx->default_tcg_memop_mask);
+    tcg_gen_mov_tl(Rd, t0);
+
+    tcg_temp_free(t0);
+
+    return true;
+}
+
+static bool trans_ldx_b(DisasContext *ctx, arg_ldx_b *a)
+{
+    TCGv t0, t1;
+    TCGv Rd = cpu_gpr[a->rd];
+    TCGv Rj = cpu_gpr[a->rj];
+    TCGv Rk = cpu_gpr[a->rk];
+    int mem_idx = ctx->mem_idx;
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_op_addr_add(t0, Rj, Rk);
+    tcg_gen_qemu_ld_tl(t1, t0, mem_idx, MO_SB);
+    tcg_gen_mov_tl(Rd, t1);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_ldx_h(DisasContext *ctx, arg_ldx_h *a)
+{
+    TCGv t0, t1;
+    TCGv Rd = cpu_gpr[a->rd];
+    TCGv Rj = cpu_gpr[a->rj];
+    TCGv Rk = cpu_gpr[a->rk];
+    int mem_idx = ctx->mem_idx;
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_op_addr_add(t0, Rj, Rk);
+    tcg_gen_qemu_ld_tl(t1, t0, mem_idx, MO_TESW |
+                       ctx->default_tcg_memop_mask);
+    tcg_gen_mov_tl(Rd, t1);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_ldx_w(DisasContext *ctx, arg_ldx_w *a)
+{
+    TCGv t0, t1;
+    TCGv Rd = cpu_gpr[a->rd];
+    TCGv Rj = cpu_gpr[a->rj];
+    TCGv Rk = cpu_gpr[a->rk];
+    int mem_idx = ctx->mem_idx;
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_op_addr_add(t0, Rj, Rk);
+    tcg_gen_qemu_ld_tl(t1, t0, mem_idx, MO_TESL |
+                       ctx->default_tcg_memop_mask);
+    tcg_gen_mov_tl(Rd, t1);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_ldx_d(DisasContext *ctx, arg_ldx_d *a)
+{
+    TCGv t0, t1;
+    TCGv Rd = cpu_gpr[a->rd];
+    TCGv Rj = cpu_gpr[a->rj];
+    TCGv Rk = cpu_gpr[a->rk];
+    int mem_idx = ctx->mem_idx;
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_op_addr_add(t0, Rj, Rk);
+    tcg_gen_qemu_ld_tl(t1, t0, mem_idx, MO_TEQ |
+                       ctx->default_tcg_memop_mask);
+    tcg_gen_mov_tl(Rd, t1);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_stx_b(DisasContext *ctx, arg_stx_b *a)
+{
+    TCGv t0, t1;
+    TCGv Rj = cpu_gpr[a->rj];
+    TCGv Rk = cpu_gpr[a->rk];
+    int mem_idx = ctx->mem_idx;
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_op_addr_add(t0, Rj, Rk);
+    gen_load_gpr(t1, a->rd);
+    tcg_gen_qemu_st_tl(t1, t0, mem_idx, MO_8);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_stx_h(DisasContext *ctx, arg_stx_h *a)
+{
+    TCGv t0, t1;
+    TCGv Rj = cpu_gpr[a->rj];
+    TCGv Rk = cpu_gpr[a->rk];
+    int mem_idx = ctx->mem_idx;
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_op_addr_add(t0, Rj, Rk);
+    gen_load_gpr(t1, a->rd);
+    tcg_gen_qemu_st_tl(t1, t0, mem_idx, MO_TEUW |
+                       ctx->default_tcg_memop_mask);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_stx_w(DisasContext *ctx, arg_stx_w *a)
+{
+    TCGv t0, t1;
+    TCGv Rj = cpu_gpr[a->rj];
+    TCGv Rk = cpu_gpr[a->rk];
+    int mem_idx = ctx->mem_idx;
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_op_addr_add(t0, Rj, Rk);
+    gen_load_gpr(t1, a->rd);
+    tcg_gen_qemu_st_tl(t1, t0, mem_idx, MO_TEUL |
+                       ctx->default_tcg_memop_mask);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_stx_d(DisasContext *ctx, arg_stx_d *a)
+{
+    TCGv t0, t1;
+    TCGv Rj = cpu_gpr[a->rj];
+    TCGv Rk = cpu_gpr[a->rk];
+    int mem_idx = ctx->mem_idx;
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_op_addr_add(t0, Rj, Rk);
+    gen_load_gpr(t1, a->rd);
+    tcg_gen_qemu_st_tl(t1, t0, mem_idx, MO_TEQ |
+                       ctx->default_tcg_memop_mask);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_ldx_bu(DisasContext *ctx, arg_ldx_bu *a)
+{
+    TCGv t0, t1;
+    TCGv Rd = cpu_gpr[a->rd];
+    TCGv Rj = cpu_gpr[a->rj];
+    TCGv Rk = cpu_gpr[a->rk];
+    int mem_idx = ctx->mem_idx;
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_op_addr_add(t0, Rj, Rk);
+    tcg_gen_qemu_ld_tl(t1, t0, mem_idx, MO_UB);
+    tcg_gen_mov_tl(Rd, t1);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_ldx_hu(DisasContext *ctx, arg_ldx_hu *a)
+{
+    TCGv t0, t1;
+    TCGv Rd = cpu_gpr[a->rd];
+    TCGv Rj = cpu_gpr[a->rj];
+    TCGv Rk = cpu_gpr[a->rk];
+    int mem_idx = ctx->mem_idx;
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_op_addr_add(t0, Rj, Rk);
+    tcg_gen_qemu_ld_tl(t1, t0, mem_idx, MO_TEUW |
+                       ctx->default_tcg_memop_mask);
+    tcg_gen_mov_tl(Rd, t1);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_ldx_wu(DisasContext *ctx, arg_ldx_wu *a)
+{
+    TCGv t0, t1;
+    TCGv Rd = cpu_gpr[a->rd];
+    TCGv Rj = cpu_gpr[a->rj];
+    TCGv Rk = cpu_gpr[a->rk];
+    int mem_idx = ctx->mem_idx;
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_op_addr_add(t0, Rj, Rk);
+    tcg_gen_qemu_ld_tl(t1, t0, mem_idx, MO_TEUL |
+                       ctx->default_tcg_memop_mask);
+    tcg_gen_mov_tl(Rd, t1);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_preld(DisasContext *ctx, arg_preld *a)
+{
+    /* Treat as NOP. */
+    return true;
+}
+
+static bool trans_dbar(DisasContext *ctx, arg_dbar * a)
+{
+    gen_loongarch_sync(a->whint);
+    return true;
+}
+
+static bool trans_ibar(DisasContext *ctx, arg_ibar *a)
+{
+    /*
+     * IBAR is a no-op in QEMU,
+     * however we need to end the translation block
+     */
+    ctx->base.is_jmp = DISAS_STOP;
+    return true;
+}
+
+static bool trans_ldptr_w(DisasContext *ctx, arg_ldptr_w *a)
+{
+    TCGv t0;
+    TCGv Rd = cpu_gpr[a->rd];
+    int mem_idx = ctx->mem_idx;
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = tcg_temp_new();
+
+    gen_base_offset_addr(t0, a->rj, a->si14 << 2);
+    tcg_gen_qemu_ld_tl(t0, t0, mem_idx, MO_TESL |
+                       ctx->default_tcg_memop_mask);
+    tcg_gen_mov_tl(Rd, t0);
+
+    tcg_temp_free(t0);
+
+    return true;
+}
+
+static bool trans_stptr_w(DisasContext *ctx, arg_stptr_w *a)
+{
+    TCGv t0, t1;
+    int mem_idx = ctx->mem_idx;
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_base_offset_addr(t0, a->rj, a->si14 << 2);
+    gen_load_gpr(t1, a->rd);
+    tcg_gen_qemu_st_tl(t1, t0, mem_idx, MO_TEUL |
+                       ctx->default_tcg_memop_mask);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_ldptr_d(DisasContext *ctx, arg_ldptr_d *a)
+{
+    TCGv t0;
+    TCGv Rd = cpu_gpr[a->rd];
+    int mem_idx = ctx->mem_idx;
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = tcg_temp_new();
+
+    gen_base_offset_addr(t0, a->rj, a->si14 << 2);
+    tcg_gen_qemu_ld_tl(t0, t0, mem_idx, MO_TEQ |
+                       ctx->default_tcg_memop_mask);
+    tcg_gen_mov_tl(Rd, t0);
+
+    tcg_temp_free(t0);
+
+    return true;
+}
+
+static bool trans_stptr_d(DisasContext *ctx, arg_stptr_d *a)
+{
+    TCGv t0, t1;
+    int mem_idx = ctx->mem_idx;
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_base_offset_addr(t0, a->rj, a->si14 << 2);
+    gen_load_gpr(t1, a->rd);
+    tcg_gen_qemu_st_tl(t1, t0, mem_idx, MO_TEQ |
+                       ctx->default_tcg_memop_mask);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+#define ASRTGT                                \
+    do {                                      \
+        TCGv t1 = get_gpr(a->rj);             \
+        TCGv t2 = get_gpr(a->rk);             \
+        gen_helper_asrtgt_d(cpu_env, t1, t2); \
+    } while (0)
+
+#define ASRTLE                                \
+    do {                                      \
+        TCGv t1 = get_gpr(a->rj);             \
+        TCGv t2 = get_gpr(a->rk);             \
+        gen_helper_asrtle_d(cpu_env, t1, t2); \
+    } while (0)
+
+#define DECL_ARG(name)   \
+    arg_ ## name arg = { \
+        .rd = a->rd,     \
+        .rj = a->rj,     \
+        .rk = a->rk,     \
+    };
+
+static bool trans_ldgt_b(DisasContext *ctx, arg_ldgt_b *a)
+{
+    ASRTGT;
+    DECL_ARG(ldx_b)
+    trans_ldx_b(ctx, &arg);
+    return true;
+}
+
+static bool trans_ldgt_h(DisasContext *ctx, arg_ldgt_h *a)
+{
+    ASRTGT;
+    DECL_ARG(ldx_h)
+    trans_ldx_h(ctx, &arg);
+    return true;
+}
+
+static bool trans_ldgt_w(DisasContext *ctx, arg_ldgt_w *a)
+{
+    ASRTGT;
+    DECL_ARG(ldx_w)
+    trans_ldx_w(ctx, &arg);
+    return true;
+}
+
+static bool trans_ldgt_d(DisasContext *ctx, arg_ldgt_d *a)
+{
+    ASRTGT;
+    DECL_ARG(ldx_d)
+    trans_ldx_d(ctx, &arg);
+    return true;
+}
+
+static bool trans_ldle_b(DisasContext *ctx, arg_ldle_b *a)
+{
+    ASRTLE;
+    DECL_ARG(ldx_b)
+    trans_ldx_b(ctx, &arg);
+    return true;
+}
+
+static bool trans_ldle_h(DisasContext *ctx, arg_ldle_h *a)
+{
+    ASRTLE;
+    DECL_ARG(ldx_h)
+    trans_ldx_h(ctx, &arg);
+    return true;
+}
+
+static bool trans_ldle_w(DisasContext *ctx, arg_ldle_w *a)
+{
+    ASRTLE;
+    DECL_ARG(ldx_w)
+    trans_ldx_w(ctx, &arg);
+    return true;
+}
+
+static bool trans_ldle_d(DisasContext *ctx, arg_ldle_d *a)
+{
+    ASRTLE;
+    DECL_ARG(ldx_d)
+    trans_ldx_d(ctx, &arg);
+    return true;
+}
+
+static bool trans_stgt_b(DisasContext *ctx, arg_stgt_b *a)
+{
+    ASRTGT;
+    DECL_ARG(stx_b)
+    trans_stx_b(ctx, &arg);
+    return true;
+}
+
+static bool trans_stgt_h(DisasContext *ctx, arg_stgt_h *a)
+{
+    ASRTGT;
+    DECL_ARG(stx_h)
+    trans_stx_h(ctx, &arg);
+    return true;
+}
+
+static bool trans_stgt_w(DisasContext *ctx, arg_stgt_w *a)
+{
+    ASRTGT;
+    DECL_ARG(stx_w)
+    trans_stx_w(ctx, &arg);
+    return true;
+}
+
+static bool trans_stgt_d(DisasContext *ctx, arg_stgt_d *a)
+{
+    ASRTGT;
+    DECL_ARG(stx_d)
+    trans_stx_d(ctx, &arg);
+    return true;
+}
+
+static bool trans_stle_b(DisasContext *ctx, arg_stle_b *a)
+{
+    ASRTLE;
+    DECL_ARG(stx_b)
+    trans_stx_b(ctx, &arg);
+    return true;
+}
+
+static bool trans_stle_h(DisasContext *ctx, arg_stle_h *a)
+{
+    ASRTLE;
+    DECL_ARG(stx_h)
+    trans_stx_h(ctx, &arg);
+    return true;
+}
+
+static bool trans_stle_w(DisasContext *ctx, arg_stle_w *a)
+{
+    ASRTLE;
+    DECL_ARG(stx_w)
+    trans_stx_w(ctx, &arg);
+    return true;
+}
+
+static bool trans_stle_d(DisasContext *ctx, arg_stle_d *a)
+{
+    ASRTLE;
+    DECL_ARG(stx_d)
+    trans_stx_d(ctx, &arg);
+    return true;
+}
+
+#undef DECL_ARG
