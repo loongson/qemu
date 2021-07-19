@@ -1,0 +1,5 @@
+LoongArch is the general processor architecture of Loongson.
+
+The following versions of the LoongArch core are supported
+    core: 3A5000
+    https://github.com/loongson/LoongArch-Documentation/releases/download/LoongArch-Vol1-v3/LoongArch-Vol1-v1.00-EN.pdf
