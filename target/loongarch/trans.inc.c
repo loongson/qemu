@@ -3084,3 +3084,238 @@ TRANS_AM_DB_D(ammin_db_du, fetch_umin)    /* trans_ammin_db_du */
 #undef TRANS_AM_DB
 #undef TRANS_AM_DB_W
 #undef TRANS_AM_DB_D
+
+/* Fixed point extra instruction translation */
+static bool trans_crc_w_b_w(DisasContext *ctx, arg_crc_w_b_w *a)
+{
+    TCGv t0, t1;
+    TCGv Rd = cpu_gpr[a->rd];
+    TCGv_i32 tsz = tcg_const_i32(1 << 1);
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = get_gpr(a->rk);
+    t1 = get_gpr(a->rj);
+
+    gen_helper_crc32(Rd, t0, t1, tsz);
+
+    tcg_temp_free_i32(tsz);
+
+    return true;
+}
+
+static bool trans_crc_w_h_w(DisasContext *ctx, arg_crc_w_h_w *a)
+{
+    TCGv t0, t1;
+    TCGv Rd = cpu_gpr[a->rd];
+    TCGv_i32 tsz = tcg_const_i32(1 << 2);
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = get_gpr(a->rk);
+    t1 = get_gpr(a->rj);
+
+    gen_helper_crc32(Rd, t0, t1, tsz);
+
+    tcg_temp_free_i32(tsz);
+
+    return true;
+}
+
+static bool trans_crc_w_w_w(DisasContext *ctx, arg_crc_w_w_w *a)
+{
+    TCGv t0, t1;
+    TCGv Rd = cpu_gpr[a->rd];
+    TCGv_i32 tsz = tcg_const_i32(1 << 4);
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = get_gpr(a->rk);
+    t1 = get_gpr(a->rj);
+
+    gen_helper_crc32(Rd, t0, t1, tsz);
+
+    tcg_temp_free_i32(tsz);
+
+    return true;
+}
+
+static bool trans_crc_w_d_w(DisasContext *ctx, arg_crc_w_d_w *a)
+{
+    TCGv t0, t1;
+    TCGv Rd = cpu_gpr[a->rd];
+    TCGv_i32 tsz = tcg_const_i32(1 << 8);
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = get_gpr(a->rk);
+    t1 = get_gpr(a->rj);
+
+    gen_helper_crc32(Rd, t0, t1, tsz);
+
+    tcg_temp_free_i32(tsz);
+
+    return true;
+}
+
+static bool trans_crcc_w_b_w(DisasContext *ctx, arg_crcc_w_b_w *a)
+{
+    TCGv t0, t1;
+    TCGv Rd = cpu_gpr[a->rd];
+    TCGv_i32 tsz = tcg_const_i32(1 << 1);
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = get_gpr(a->rk);
+    t1 = get_gpr(a->rj);
+
+    gen_helper_crc32c(Rd, t0, t1, tsz);
+
+    tcg_temp_free_i32(tsz);
+
+    return true;
+}
+
+static bool trans_crcc_w_h_w(DisasContext *ctx, arg_crcc_w_h_w *a)
+{
+    TCGv t0, t1;
+    TCGv Rd = cpu_gpr[a->rd];
+    TCGv_i32 tsz = tcg_const_i32(1 << 2);
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = get_gpr(a->rk);
+    t1 = get_gpr(a->rj);
+
+    gen_helper_crc32c(Rd, t0, t1, tsz);
+
+    tcg_temp_free_i32(tsz);
+
+    return true;
+}
+
+static bool trans_crcc_w_w_w(DisasContext *ctx, arg_crcc_w_w_w *a)
+{
+    TCGv t0, t1;
+    TCGv Rd = cpu_gpr[a->rd];
+    TCGv_i32 tsz = tcg_const_i32(1 << 4);
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = get_gpr(a->rk);
+    t1 = get_gpr(a->rj);
+
+    gen_helper_crc32c(Rd, t0, t1, tsz);
+
+    tcg_temp_free_i32(tsz);
+
+    return true;
+}
+
+static bool trans_crcc_w_d_w(DisasContext *ctx, arg_crcc_w_d_w *a)
+{
+    TCGv t0, t1;
+    TCGv Rd = cpu_gpr[a->rd];
+    TCGv_i32 tsz = tcg_const_i32(1 << 8);
+
+    if (a->rd == 0) {
+        /* Nop */
+        return true;
+    }
+
+    t0 = get_gpr(a->rk);
+    t1 = get_gpr(a->rj);
+
+    gen_helper_crc32c(Rd, t0, t1, tsz);
+
+    tcg_temp_free_i32(tsz);
+
+    return true;
+}
+
+static bool trans_break(DisasContext *ctx, arg_break *a)
+{
+    generate_exception_end(ctx, EXCP_BREAK);
+    return true;
+}
+
+static bool trans_syscall(DisasContext *ctx, arg_syscall *a)
+{
+    generate_exception_end(ctx, EXCP_SYSCALL);
+    return true;
+}
+
+static bool trans_asrtle_d(DisasContext *ctx, arg_asrtle_d * a)
+{
+    TCGv t0, t1;
+
+    t0 = get_gpr(a->rj);
+    t1 = get_gpr(a->rk);
+
+    gen_helper_asrtle_d(cpu_env, t0, t1);
+
+    return true;
+}
+
+static bool trans_asrtgt_d(DisasContext *ctx, arg_asrtgt_d * a)
+{
+    TCGv t0, t1;
+
+    t0 = get_gpr(a->rj);
+    t1 = get_gpr(a->rk);
+
+    gen_helper_asrtgt_d(cpu_env, t0, t1);
+
+    return true;
+}
+
+static bool trans_rdtimel_w(DisasContext *ctx, arg_rdtimel_w *a)
+{
+    /* Nop */
+    return true;
+}
+
+static bool trans_rdtimeh_w(DisasContext *ctx, arg_rdtimeh_w *a)
+{
+    /* Nop */
+    return true;
+}
+
+static bool trans_rdtime_d(DisasContext *ctx, arg_rdtime_d *a)
+{
+    /* Nop */
+    return true;
+}
+
+static bool trans_cpucfg(DisasContext *ctx, arg_cpucfg *a)
+{
+    TCGv t0;
+    TCGv Rd = cpu_gpr[a->rd];
+
+    t0 = get_gpr(a->rj);
+
+    gen_helper_cpucfg(Rd, cpu_env, t0);
+
+    return true;
+}

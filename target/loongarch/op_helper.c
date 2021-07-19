@@ -13,6 +13,8 @@
 #include "exec/helper-proto.h"
 #include "exec/exec-all.h"
 #include "exec/cpu_ldst.h"
+#include "qemu/crc32c.h"
+#include <zlib.h>
 
 /* Exceptions helpers */
 void helper_raise_exception_err(CPULoongArchState *env, uint32_t exception,
@@ -158,4 +160,71 @@ void helper_asrtgt_d(CPULoongArchState *env, target_ulong rj, target_ulong rk)
     if (rj <= rk) {
         do_raise_exception(env, EXCP_ADE, GETPC());
     }
+}
+
+target_ulong helper_crc32(target_ulong val, target_ulong m, uint32_t sz)
+{
+    uint8_t buf[8];
+    target_ulong mask = ((sz * 8) == 64) ? -1ULL : ((1ULL << (sz * 8)) - 1);
+
+    m &= mask;
+    stq_le_p(buf, m);
+    return (int32_t) (crc32(val ^ 0xffffffff, buf, sz) ^ 0xffffffff);
+}
+
+target_ulong helper_crc32c(target_ulong val, target_ulong m, uint32_t sz)
+{
+    uint8_t buf[8];
+    target_ulong mask = ((sz * 8) == 64) ? -1ULL : ((1ULL << (sz * 8)) - 1);
+    m &= mask;
+    stq_le_p(buf, m);
+    return (int32_t) (crc32c(val, buf, sz) ^ 0xffffffff);
+}
+
+target_ulong helper_cpucfg(CPULoongArchState *env, target_ulong rj)
+{
+    target_ulong r = 0;
+
+    switch (rj) {
+    case 0:
+        r = env->CSR_MCSR0 & 0xffffffff;
+        break;
+    case 1:
+        r = (env->CSR_MCSR0 & 0xffffffff00000000) >> 32;
+        break;
+    case 2:
+        r = env->CSR_MCSR1 & 0xffffffff;
+        break;
+    case 3:
+        r = (env->CSR_MCSR1 & 0xffffffff00000000) >> 32;
+        break;
+    case 4:
+        r = env->CSR_MCSR2 & 0xffffffff;
+        break;
+    case 5:
+        r = (env->CSR_MCSR2 & 0xffffffff00000000) >> 32;
+        break;
+    case 6:
+        r = env->CSR_MCSR3 & 0xffffffff;
+        break;
+    case 10:
+        r = env->CSR_MCSR8 & 0xffffffff;
+        break;
+    case 11:
+        r = (env->CSR_MCSR8 & 0xffffffff00000000) >> 32;
+        break;
+    case 12:
+        r = env->CSR_MCSR9 & 0xffffffff;
+        break;
+    case 13:
+        r = (env->CSR_MCSR9 & 0xffffffff00000000) >> 32;
+        break;
+    case 14:
+        r = env->CSR_MCSR10 & 0xffffffff;
+        break;
+    case 30:
+        r = env->CSR_MCSR24 & 0xffffffff;
+        break;
+    }
+    return r;
 }
