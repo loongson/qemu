@@ -5028,3 +5028,260 @@ static bool trans_movcf2gr(DisasContext *ctx, arg_movcf2gr *a)
 
     return true;
 }
+
+/* Floating point load/store instruction translation */
+static bool trans_fld_s(DisasContext *ctx, arg_fld_s *a)
+{
+    TCGv t0;
+    TCGv_i32 fp0;
+
+    t0 = tcg_temp_new();
+    fp0 = tcg_temp_new_i32();
+
+    check_fpu_enabled(ctx);
+    gen_base_offset_addr(t0, a->rj, a->si12);
+    tcg_gen_qemu_ld_i32(fp0, t0, ctx->mem_idx, MO_TESL |
+                        ctx->default_tcg_memop_mask);
+    gen_store_fpr32(fp0, a->fd);
+
+    tcg_temp_free(t0);
+    tcg_temp_free_i32(fp0);
+
+
+    return true;
+}
+
+static bool trans_fst_s(DisasContext *ctx, arg_fst_s *a)
+{
+    TCGv t0;
+    TCGv_i32 fp0;
+
+    t0 = tcg_temp_new();
+    fp0 = tcg_temp_new_i32();
+
+    check_fpu_enabled(ctx);
+    gen_base_offset_addr(t0, a->rj, a->si12);
+    gen_load_fpr32(fp0, a->fd);
+    tcg_gen_qemu_st_i32(fp0, t0, ctx->mem_idx, MO_TEUL |
+                        ctx->default_tcg_memop_mask);
+
+    tcg_temp_free(t0);
+    tcg_temp_free_i32(fp0);
+
+    return true;
+}
+
+static bool trans_fld_d(DisasContext *ctx, arg_fld_d *a)
+{
+    TCGv t0;
+    TCGv_i64 fp0;
+
+    t0 = tcg_temp_new();
+    fp0 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_base_offset_addr(t0, a->rj, a->si12);
+    tcg_gen_qemu_ld_i64(fp0, t0, ctx->mem_idx, MO_TEQ |
+                        ctx->default_tcg_memop_mask);
+    gen_store_fpr64(fp0, a->fd);
+
+    tcg_temp_free(t0);
+    tcg_temp_free_i64(fp0);
+
+    return true;
+}
+
+static bool trans_fst_d(DisasContext *ctx, arg_fst_d *a)
+{
+    TCGv t0;
+    TCGv_i64 fp0;
+
+    t0 = tcg_temp_new();
+    fp0 = tcg_temp_new_i64();
+
+    check_fpu_enabled(ctx);
+    gen_base_offset_addr(t0, a->rj, a->si12);
+    gen_load_fpr64(fp0, a->fd);
+    tcg_gen_qemu_st_i64(fp0, t0, ctx->mem_idx, MO_TEQ |
+                        ctx->default_tcg_memop_mask);
+
+    tcg_temp_free(t0);
+    tcg_temp_free_i64(fp0);
+
+    return true;
+}
+
+static bool trans_fldx_s(DisasContext *ctx, arg_fldx_s *a)
+{
+    TCGv t0;
+    TCGv_i32 fp0;
+    TCGv Rj = cpu_gpr[a->rj];
+    TCGv Rk = cpu_gpr[a->rk];
+
+    t0 = tcg_temp_new();
+    fp0 = tcg_temp_new_i32();
+
+    if (a->rj == 0 && a->rk == 0) {
+        /* Nop */
+        return true;
+    }
+
+    tcg_gen_add_tl(t0, Rj, Rk);
+    tcg_gen_qemu_ld_tl(t0, t0, ctx->mem_idx, MO_TESL);
+    tcg_gen_trunc_tl_i32(fp0, t0);
+    gen_store_fpr32(fp0, a->fd);
+
+    tcg_temp_free(t0);
+    tcg_temp_free_i32(fp0);
+
+    return true;
+}
+
+static bool trans_fldx_d(DisasContext *ctx, arg_fldx_d *a)
+{
+    TCGv t0;
+    TCGv_i64 fp0;
+    TCGv Rj = cpu_gpr[a->rj];
+    TCGv Rk = cpu_gpr[a->rk];
+
+    t0 = tcg_temp_new();
+    fp0 = tcg_temp_new_i64();
+
+    if (a->rj == 0 && a->rk == 0) {
+        /* Nop */
+        return true;
+    }
+
+    tcg_gen_add_tl(t0, Rj, Rk);
+    tcg_gen_qemu_ld_i64(fp0, t0, ctx->mem_idx, MO_TEQ);
+    gen_store_fpr64(fp0, a->fd);
+
+    tcg_temp_free(t0);
+    tcg_temp_free_i64(fp0);
+
+    return true;
+}
+
+static bool trans_fstx_s(DisasContext *ctx, arg_fstx_s *a)
+{
+    TCGv t0;
+    TCGv_i32 fp0;
+    TCGv Rj = cpu_gpr[a->rj];
+    TCGv Rk = cpu_gpr[a->rk];
+
+    t0 = tcg_temp_new();
+    fp0 = tcg_temp_new_i32();
+
+    if (a->rj == 0 && a->rk == 0) {
+        /* Nop */
+        return true;
+    }
+
+    tcg_gen_add_tl(t0, Rj, Rk);
+    gen_load_fpr32(fp0, a->fd);
+    tcg_gen_qemu_st_i32(fp0, t0, ctx->mem_idx, MO_TEUL);
+
+    tcg_temp_free(t0);
+    tcg_temp_free_i32(fp0);
+
+    return true;
+}
+
+static bool trans_fstx_d(DisasContext *ctx, arg_fstx_d *a)
+{
+    TCGv t0;
+    TCGv_i64 fp0;
+    TCGv Rj = cpu_gpr[a->rj];
+    TCGv Rk = cpu_gpr[a->rk];
+
+    t0 = tcg_temp_new();
+    fp0 = tcg_temp_new_i64();
+
+    if (a->rj == 0 && a->rk == 0) {
+        /* Nop */
+        return true;
+    }
+
+    tcg_gen_add_tl(t0, Rj, Rk);
+    gen_load_fpr64(fp0, a->fd);
+    tcg_gen_qemu_st_i64(fp0, t0, ctx->mem_idx, MO_TEQ);
+
+    tcg_temp_free_i64(fp0);
+    tcg_temp_free(t0);
+
+    return true;
+}
+
+
+#define DECL_ARG2(name)  \
+    arg_ ## name arg = { \
+        .fd = a->fd,     \
+        .rj = a->rj,     \
+        .rk = a->rk,     \
+    };
+
+static bool trans_fldgt_s(DisasContext *ctx, arg_fldgt_s *a)
+{
+    ASRTGT;
+    DECL_ARG2(fldx_s)
+    trans_fldx_s(ctx, &arg);
+    return true;
+}
+
+static bool trans_fldgt_d(DisasContext *ctx, arg_fldgt_d *a)
+{
+    ASRTGT;
+    DECL_ARG2(fldx_d);
+    trans_fldx_d(ctx, &arg);
+    return true;
+}
+
+static bool trans_fldle_s(DisasContext *ctx, arg_fldle_s *a)
+{
+    ASRTLE;
+    DECL_ARG2(fldx_s);
+    trans_fldx_s(ctx, &arg);
+    return true;
+}
+
+static bool trans_fldle_d(DisasContext *ctx, arg_fldle_d *a)
+{
+    ASRTLE;
+    DECL_ARG2(fldx_d);
+    trans_fldx_d(ctx, &arg);
+    return true;
+}
+
+static bool trans_fstgt_s(DisasContext *ctx, arg_fstgt_s *a)
+{
+    ASRTGT;
+    DECL_ARG2(fstx_s);
+    trans_fstx_s(ctx, &arg);
+    return true;
+}
+
+static bool trans_fstgt_d(DisasContext *ctx, arg_fstgt_d *a)
+{
+    ASRTGT;
+    DECL_ARG2(fstx_d);
+    trans_fstx_d(ctx, &arg);
+    return true;
+}
+
+static bool trans_fstle_s(DisasContext *ctx, arg_fstle_s *a)
+{
+    ASRTLE;
+    DECL_ARG2(fstx_s);
+    trans_fstx_s(ctx, &arg);
+    return true;
+}
+
+static bool trans_fstle_d(DisasContext *ctx, arg_fstle_d *a)
+{
+    ASRTLE;
+    DECL_ARG2(fstx_d);
+    trans_fstx_d(ctx, &arg);
+    return true;
+}
+
+#undef DECL_ARG2
