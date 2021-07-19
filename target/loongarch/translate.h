@@ -35,6 +35,7 @@ void check_fpu_enabled(DisasContext *ctx);
 
 void gen_base_offset_addr(TCGv addr, int base, int offset);
 void gen_load_gpr(TCGv t, int reg);
+TCGv get_gpr(int regno);
 void gen_load_fpr32(TCGv_i32 t, int reg);
 void gen_load_fpr64(TCGv_i64 t, int reg);
 void gen_store_fpr32(TCGv_i32 t, int reg);

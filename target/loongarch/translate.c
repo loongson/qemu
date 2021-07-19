@@ -57,6 +57,15 @@ void gen_load_gpr(TCGv t, int reg)
     }
 }
 
+TCGv get_gpr(int regno)
+{
+    if (regno == 0) {
+        return tcg_constant_tl(0);
+    } else {
+        return cpu_gpr[regno];
+    }
+}
+
 static inline void gen_save_pc(target_ulong pc)
 {
     tcg_gen_movi_tl(cpu_PC, pc);
@@ -286,6 +295,9 @@ static bool loongarch_tr_breakpoint_check(DisasContextBase *dcbase,
 {
     return true;
 }
+
+#include "decode-insns.c.inc"
+#include "trans.inc.c"
 
 static void loongarch_tr_translate_insn(DisasContextBase *dcbase, CPUState *cs)
 {
