@@ -79,6 +79,28 @@ static void loongarch_cpu_set_pc(CPUState *cs, vaddr value)
     env->active_tc.PC = value & ~(target_ulong)1;
 }
 
+bool loongarch_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+{
+    if (interrupt_request & CPU_INTERRUPT_HARD) {
+        LoongArchCPU *cpu = LOONGARCH_CPU(cs);
+        CPULoongArchState *env = &cpu->env;
+
+        if (cpu_loongarch_hw_interrupts_enabled(env) &&
+            cpu_loongarch_hw_interrupts_pending(env)) {
+            cs->exception_index = EXCP_INTE;
+            env->error_code = 0;
+            loongarch_cpu_do_interrupt(cs);
+            return true;
+        }
+    }
+    return false;
+}
+
+void loongarch_cpu_do_interrupt(CPUState *cs)
+{
+    cs->exception_index = EXCP_NONE;
+}
+
 #ifdef CONFIG_TCG
 static void loongarch_cpu_synchronize_from_tb(CPUState *cs,
                                               const TranslationBlock *tb)
@@ -246,6 +268,7 @@ static Property loongarch_cpu_properties[] = {
 static struct TCGCPUOps loongarch_tcg_ops = {
     .initialize = loongarch_tcg_init,
     .synchronize_from_tb = loongarch_cpu_synchronize_from_tb,
+    .cpu_exec_interrupt = loongarch_cpu_exec_interrupt,
 };
 #endif /* CONFIG_TCG */
 
