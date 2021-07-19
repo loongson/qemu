@@ -13,12 +13,17 @@
 %rj      5:5
 %rk      10:5
 %sa2     15:2
+%sa3     15:3
 %si12    10:s12
 %ui12    10:12
 %si16    10:s16
 %si20    5:s20
 %ui5     10:5
 %ui6     10:6
+%msbw    16:5
+%lsbw    10:5
+%msbd    16:6
+%lsbd    10:6
 
 #
 # Argument sets
@@ -31,6 +36,10 @@
 &fmt_rdsi20         rd si20
 &fmt_rdrjui5        rd rj ui5
 &fmt_rdrjui6        rd rj ui6
+&fmt_rdrj           rd rj
+&fmt_rdrjrksa3      rd rj rk sa3
+&fmt_rdrjmsbwlsbw   rd rj msbw lsbw
+&fmt_rdrjmsbdlsbd   rd rj msbd lsbd
 
 #
 # Formats
@@ -43,6 +52,10 @@
 @fmt_rdsi20          .... ... .................... .....      &fmt_rdsi20         %rd %si20
 @fmt_rdrjui5         .... ........ ..... ..... ..... .....    &fmt_rdrjui5        %rd %rj %ui5
 @fmt_rdrjui6         .... ........ .... ...... ..... .....    &fmt_rdrjui6        %rd %rj %ui6
+@fmt_rdrj            .... ........ ..... ..... ..... .....    &fmt_rdrj           %rd %rj
+@fmt_rdrjmsbwlsbw    .... ....... ..... . ..... ..... .....   &fmt_rdrjmsbwlsbw   %rd %rj %msbw %lsbw
+@fmt_rdrjmsbdlsbd    .... ...... ...... ...... ..... .....    &fmt_rdrjmsbdlsbd   %rd %rj %msbd %lsbd
+@fmt_rdrjrksa3       .... ........ .. ... ..... ..... .....   &fmt_rdrjrksa3      %rd %rj %rk %sa3
 
 #
 # Fixed point arithmetic operation instruction
@@ -113,3 +126,35 @@ srai_w           0000 00000100 10001 ..... ..... .....    @fmt_rdrjui5
 srai_d           0000 00000100 1001 ...... ..... .....    @fmt_rdrjui6
 rotri_w          0000 00000100 11001 ..... ..... .....    @fmt_rdrjui5
 rotri_d          0000 00000100 1101 ...... ..... .....    @fmt_rdrjui6
+
+#
+# Fixed point bit operation instruction
+#
+ext_w_h          0000 00000000 00000 10110 ..... .....    @fmt_rdrj
+ext_w_b          0000 00000000 00000 10111 ..... .....    @fmt_rdrj
+clo_w            0000 00000000 00000 00100 ..... .....    @fmt_rdrj
+clz_w            0000 00000000 00000 00101 ..... .....    @fmt_rdrj
+cto_w            0000 00000000 00000 00110 ..... .....    @fmt_rdrj
+ctz_w            0000 00000000 00000 00111 ..... .....    @fmt_rdrj
+clo_d            0000 00000000 00000 01000 ..... .....    @fmt_rdrj
+clz_d            0000 00000000 00000 01001 ..... .....    @fmt_rdrj
+cto_d            0000 00000000 00000 01010 ..... .....    @fmt_rdrj
+ctz_d            0000 00000000 00000 01011 ..... .....    @fmt_rdrj
+revb_2h          0000 00000000 00000 01100 ..... .....    @fmt_rdrj
+revb_4h          0000 00000000 00000 01101 ..... .....    @fmt_rdrj
+revb_2w          0000 00000000 00000 01110 ..... .....    @fmt_rdrj
+revb_d           0000 00000000 00000 01111 ..... .....    @fmt_rdrj
+revh_2w          0000 00000000 00000 10000 ..... .....    @fmt_rdrj
+revh_d           0000 00000000 00000 10001 ..... .....    @fmt_rdrj
+bitrev_4b        0000 00000000 00000 10010 ..... .....    @fmt_rdrj
+bitrev_8b        0000 00000000 00000 10011 ..... .....    @fmt_rdrj
+bitrev_w         0000 00000000 00000 10100 ..... .....    @fmt_rdrj
+bitrev_d         0000 00000000 00000 10101 ..... .....    @fmt_rdrj
+bytepick_w       0000 00000000 100 .. ..... ..... .....   @fmt_rdrjrksa2
+bytepick_d       0000 00000000 11 ... ..... ..... .....   @fmt_rdrjrksa3
+maskeqz          0000 00000001 00110 ..... ..... .....    @fmt_rdrjrk
+masknez          0000 00000001 00111 ..... ..... .....    @fmt_rdrjrk
+bstrins_w        0000 0000011 ..... 0 ..... ..... .....   @fmt_rdrjmsbwlsbw
+bstrpick_w       0000 0000011 ..... 1 ..... ..... .....   @fmt_rdrjmsbwlsbw
+bstrins_d        0000 000010 ...... ...... ..... .....    @fmt_rdrjmsbdlsbd
+bstrpick_d       0000 000011 ...... ...... ..... .....    @fmt_rdrjmsbdlsbd
