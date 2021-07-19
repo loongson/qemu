@@ -5285,3 +5285,252 @@ static bool trans_fstle_d(DisasContext *ctx, arg_fstle_d *a)
 }
 
 #undef DECL_ARG2
+
+/* Branch Instructions translation */
+static bool trans_beqz(DisasContext *ctx, arg_beqz *a)
+{
+    TCGv t0, t1;
+    int bcond_flag = 0;
+
+    t0 = tcg_temp_new();
+    t1 = tcg_const_i64(0);
+
+    if (a->rj != 0) {
+        gen_load_gpr(t0, a->rj);
+        bcond_flag = 1;
+    }
+
+    if (bcond_flag == 0) {
+        ctx->hflags |= LOONGARCH_HFLAG_B;
+    } else {
+        tcg_gen_setcond_tl(TCG_COND_EQ, bcond, t0, t1);
+        ctx->hflags |= LOONGARCH_HFLAG_BC;
+    }
+    ctx->btarget = ctx->base.pc_next + (a->offs21 << 2);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_bnez(DisasContext *ctx, arg_bnez *a)
+{
+    TCGv t0, t1;
+
+    t0 = tcg_temp_new();
+    t1 = tcg_const_i64(0);
+
+    if (a->rj != 0) {
+        gen_load_gpr(t0, a->rj);
+        tcg_gen_setcond_tl(TCG_COND_NE, bcond, t0, t1);
+        ctx->hflags |= LOONGARCH_HFLAG_BC;
+    }
+    ctx->btarget = ctx->base.pc_next + (a->offs21 << 2);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_bceqz(DisasContext *ctx, arg_bceqz *a)
+{
+    TCGv t0, t1;
+    TCGv_i32 cj;
+
+    cj = tcg_const_i32(a->cj);
+    t0 = tcg_temp_new();
+    t1 = tcg_const_i64(0);
+
+    gen_helper_movcf2reg(t0, cpu_env, cj);
+    tcg_gen_setcond_tl(TCG_COND_EQ, bcond, t0, t1);
+    ctx->hflags |= LOONGARCH_HFLAG_BC;
+    ctx->btarget = ctx->base.pc_next + (a->offs21 << 2);
+
+    tcg_temp_free_i32(cj);
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_bcnez(DisasContext *ctx, arg_bcnez *a)
+{
+    TCGv t0, t1;
+    TCGv_i32 cj;
+
+    cj = tcg_const_i32(a->cj);
+    t0 = tcg_temp_new();
+    t1 = tcg_const_i64(0);
+
+    gen_helper_movcf2reg(t0, cpu_env, cj);
+    tcg_gen_setcond_tl(TCG_COND_NE, bcond, t0, t1);
+    ctx->hflags |= LOONGARCH_HFLAG_BC;
+    ctx->btarget = ctx->base.pc_next + (a->offs21 << 2);
+
+    tcg_temp_free_i32(cj);
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_b(DisasContext *ctx, arg_b *a)
+{
+    ctx->hflags |= LOONGARCH_HFLAG_B;
+    ctx->btarget = ctx->base.pc_next + (a->offs << 2);
+
+    return true;
+}
+
+static bool trans_bl(DisasContext *ctx, arg_bl *a)
+{
+    ctx->btarget = ctx->base.pc_next + (a->offs << 2);
+    tcg_gen_movi_tl(cpu_gpr[1], ctx->base.pc_next + 4);
+    ctx->hflags |= LOONGARCH_HFLAG_B;
+    gen_branch(ctx, 4);
+
+    return true;
+}
+
+static bool trans_blt(DisasContext *ctx, arg_blt *a)
+{
+    TCGv t0, t1;
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_load_gpr(t0, a->rj);
+    gen_load_gpr(t1, a->rd);
+
+    tcg_gen_setcond_tl(TCG_COND_LT, bcond, t0, t1);
+    ctx->hflags |= LOONGARCH_HFLAG_BC;
+    ctx->btarget = ctx->base.pc_next + (a->offs16 << 2);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_bge(DisasContext *ctx, arg_bge *a)
+{
+    TCGv t0, t1;
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_load_gpr(t0, a->rj);
+    gen_load_gpr(t1, a->rd);
+
+    tcg_gen_setcond_tl(TCG_COND_GE, bcond, t0, t1);
+    ctx->hflags |= LOONGARCH_HFLAG_BC;
+    ctx->btarget = ctx->base.pc_next + (a->offs16 << 2);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_bltu(DisasContext *ctx, arg_bltu *a)
+{
+    TCGv t0, t1;
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_load_gpr(t0, a->rj);
+    gen_load_gpr(t1, a->rd);
+
+    tcg_gen_setcond_tl(TCG_COND_LTU, bcond, t0, t1);
+    ctx->hflags |= LOONGARCH_HFLAG_BC;
+    ctx->btarget = ctx->base.pc_next + (a->offs16 << 2);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_bgeu(DisasContext *ctx, arg_bgeu *a)
+{
+    TCGv t0, t1;
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    gen_load_gpr(t0, a->rj);
+    gen_load_gpr(t1, a->rd);
+
+    tcg_gen_setcond_tl(TCG_COND_GEU, bcond, t0, t1);
+    ctx->hflags |= LOONGARCH_HFLAG_BC;
+    ctx->btarget = ctx->base.pc_next + (a->offs16 << 2);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_beq(DisasContext *ctx, arg_beq *a)
+{
+    TCGv t0, t1;
+    int bcond_flag = 0;
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    if (a->rj != a->rd) {
+        gen_load_gpr(t0, a->rj);
+        gen_load_gpr(t1, a->rd);
+        bcond_flag = 1;
+    }
+
+    if (bcond_flag == 0) {
+        ctx->hflags |= LOONGARCH_HFLAG_B;
+    } else {
+        tcg_gen_setcond_tl(TCG_COND_EQ, bcond, t0, t1);
+        ctx->hflags |= LOONGARCH_HFLAG_BC;
+    }
+    ctx->btarget = ctx->base.pc_next + (a->offs16 << 2);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_bne(DisasContext *ctx, arg_bne *a)
+{
+    TCGv t0, t1;
+
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+
+    if (a->rj != a->rd) {
+        gen_load_gpr(t0, a->rj);
+        gen_load_gpr(t1, a->rd);
+        tcg_gen_setcond_tl(TCG_COND_NE, bcond, t0, t1);
+        ctx->hflags |= LOONGARCH_HFLAG_BC;
+    }
+    ctx->btarget = ctx->base.pc_next + (a->offs16 << 2);
+
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
+
+    return true;
+}
+
+static bool trans_jirl(DisasContext *ctx, arg_jirl *a)
+{
+    gen_base_offset_addr(btarget, a->rj, a->offs16 << 2);
+    if (a->rd != 0) {
+        tcg_gen_movi_tl(cpu_gpr[a->rd], ctx->base.pc_next + 4);
+    }
+    ctx->hflags |= LOONGARCH_HFLAG_BR;
+    gen_branch(ctx, 4);
+
+    return true;
+}
