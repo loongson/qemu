@@ -686,11 +686,13 @@ static float128 float128_pack_raw(const FloatParts128 *p)
 #include "softfloat-specialize.c.inc"
 
 #define PARTS_GENERIC_64_128(NAME, P) \
-    QEMU_GENERIC(P, (FloatParts128 *, parts128_##NAME), parts64_##NAME)
+    _Generic((P), FloatParts64 *: parts64_##NAME, \
+                  FloatParts128 *: parts128_##NAME)
 
 #define PARTS_GENERIC_64_128_256(NAME, P) \
-    QEMU_GENERIC(P, (FloatParts256 *, parts256_##NAME), \
-                 (FloatParts128 *, parts128_##NAME), parts64_##NAME)
+    _Generic((P), FloatParts64 *: parts64_##NAME, \
+                  FloatParts128 *: parts128_##NAME, \
+                  FloatParts256 *: parts256_##NAME)
 
 #define parts_default_nan(P, S)    PARTS_GENERIC_64_128(default_nan, P)(P, S)
 #define parts_silence_nan(P, S)    PARTS_GENERIC_64_128(silence_nan, P)(P, S)
@@ -892,11 +894,13 @@ static void parts128_log2(FloatParts128 *a, float_status *s, const FloatFmt *f);
  */
 
 #define FRAC_GENERIC_64_128(NAME, P) \
-    QEMU_GENERIC(P, (FloatParts128 *, frac128_##NAME), frac64_##NAME)
+    _Generic((P), FloatParts64 *: frac64_##NAME, \
+                  FloatParts128 *: frac128_##NAME)
 
 #define FRAC_GENERIC_64_128_256(NAME, P) \
-    QEMU_GENERIC(P, (FloatParts256 *, frac256_##NAME), \
-                 (FloatParts128 *, frac128_##NAME), frac64_##NAME)
+    _Generic((P), FloatParts64 *: frac64_##NAME, \
+                  FloatParts128 *: frac128_##NAME, \
+                  FloatParts256 *: frac256_##NAME)
 
 static bool frac64_add(FloatParts64 *r, FloatParts64 *a, FloatParts64 *b)
 {
@@ -4818,7 +4822,7 @@ float32 float32_exp2(float32 a, float_status *status)
 
     float_raise(float_flag_inexact, status);
 
-    float64_unpack_canonical(&xnp, float64_ln2, status);
+    float64_unpack_canonical(&tp, float64_ln2, status);
     xp = *parts_mul(&xp, &tp, status);
     xnp = xp;
 

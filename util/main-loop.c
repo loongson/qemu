@@ -170,6 +170,7 @@ int qemu_init_main_loop(Error **errp)
     if (!qemu_aio_context) {
         return -EMFILE;
     }
+    qemu_set_current_aio_context(qemu_aio_context);
     qemu_notify_bh = qemu_bh_new(notify_event_cb, NULL);
     gpollfds = g_array_new(FALSE, FALSE, sizeof(GPollFD));
     src = aio_get_g_source(qemu_aio_context);
@@ -543,9 +544,9 @@ void main_loop_wait(int nonblocking)
 
 /* Functions to operate on the main QEMU AioContext.  */
 
-QEMUBH *qemu_bh_new(QEMUBHFunc *cb, void *opaque)
+QEMUBH *qemu_bh_new_full(QEMUBHFunc *cb, void *opaque, const char *name)
 {
-    return aio_bh_new(qemu_aio_context, cb, opaque);
+    return aio_bh_new_full(qemu_aio_context, cb, opaque, name);
 }
 
 /*

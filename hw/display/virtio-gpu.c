@@ -340,8 +340,15 @@ static void virtio_gpu_resource_create_blob(VirtIOGPU *g,
         return;
     }
 
-    res = virtio_gpu_find_resource(g, cblob.resource_id);
-    if (res) {
+    if (cblob.blob_mem != VIRTIO_GPU_BLOB_MEM_GUEST &&
+        cblob.blob_flags != VIRTIO_GPU_BLOB_FLAG_USE_SHAREABLE) {
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: invalid memory type\n",
+                      __func__);
+        cmd->error = VIRTIO_GPU_RESP_ERR_INVALID_PARAMETER;
+        return;
+    }
+
+    if (virtio_gpu_find_resource(g, cblob.resource_id)) {
         qemu_log_mask(LOG_GUEST_ERROR, "%s: resource already exists %d\n",
                       __func__, cblob.resource_id);
         cmd->error = VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID;
@@ -352,25 +359,12 @@ static void virtio_gpu_resource_create_blob(VirtIOGPU *g,
     res->resource_id = cblob.resource_id;
     res->blob_size = cblob.size;
 
-    if (cblob.blob_mem != VIRTIO_GPU_BLOB_MEM_GUEST &&
-        cblob.blob_flags != VIRTIO_GPU_BLOB_FLAG_USE_SHAREABLE) {
-        qemu_log_mask(LOG_GUEST_ERROR, "%s: invalid memory type\n",
-                      __func__);
-        cmd->error = VIRTIO_GPU_RESP_ERR_INVALID_PARAMETER;
-        g_free(res);
-        return;
-    }
-
-    if (res->iov) {
-        cmd->error = VIRTIO_GPU_RESP_ERR_UNSPEC;
-        return;
-    }
-
     ret = virtio_gpu_create_mapping_iov(g, cblob.nr_entries, sizeof(cblob),
                                         cmd, &res->addrs, &res->iov,
                                         &res->iov_cnt);
-    if (ret != 0) {
+    if (ret != 0 || res->iov) {
         cmd->error = VIRTIO_GPU_RESP_ERR_UNSPEC;
+        g_free(res);
         return;
     }
 
@@ -610,12 +604,6 @@ static void virtio_gpu_do_set_scanout(VirtIOGPU *g,
     struct virtio_gpu_scanout *scanout;
     uint8_t *data;
 
-    if (scanout_id >= g->parent_obj.conf.max_outputs) {
-        qemu_log_mask(LOG_GUEST_ERROR, "%s: illegal scanout id specified %d",
-                      __func__, scanout_id);
-        *error = VIRTIO_GPU_RESP_ERR_INVALID_SCANOUT_ID;
-        return;
-    }
     scanout = &g->parent_obj.scanout[scanout_id];
 
     if (r->x > fb->width ||
@@ -694,6 +682,13 @@ static void virtio_gpu_set_scanout(VirtIOGPU *g,
     trace_virtio_gpu_cmd_set_scanout(ss.scanout_id, ss.resource_id,
                                      ss.r.width, ss.r.height, ss.r.x, ss.r.y);
 
+    if (ss.scanout_id >= g->parent_obj.conf.max_outputs) {
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: illegal scanout id specified %d",
+                      __func__, ss.scanout_id);
+        cmd->error = VIRTIO_GPU_RESP_ERR_INVALID_SCANOUT_ID;
+        return;
+    }
+
     if (ss.resource_id == 0) {
         virtio_gpu_disable_scanout(g, ss.scanout_id);
         return;
@@ -729,6 +724,13 @@ static void virtio_gpu_set_scanout_blob(VirtIOGPU *g,
     trace_virtio_gpu_cmd_set_scanout_blob(ss.scanout_id, ss.resource_id,
                                           ss.r.width, ss.r.height, ss.r.x,
                                           ss.r.y);
+
+    if (ss.scanout_id >= g->parent_obj.conf.max_outputs) {
+        qemu_log_mask(LOG_GUEST_ERROR, "%s: illegal scanout id specified %d",
+                      __func__, ss.scanout_id);
+        cmd->error = VIRTIO_GPU_RESP_ERR_INVALID_SCANOUT_ID;
+        return;
+    }
 
     if (ss.resource_id == 0) {
         virtio_gpu_disable_scanout(g, ss.scanout_id);
@@ -1419,6 +1421,7 @@ static const TypeInfo virtio_gpu_info = {
     .class_size = sizeof(VirtIOGPUClass),
     .class_init = virtio_gpu_class_init,
 };
+module_obj(TYPE_VIRTIO_GPU);
 
 static void virtio_register_types(void)
 {

@@ -30,7 +30,6 @@
 #include "exec/helper-proto.h"
 #include "exec/helper-gen.h"
 #include "exec/log.h"
-#include "trace-tcg.h"
 #include "translate-a64.h"
 #include "fpu/softfloat.h"
 
@@ -69,11 +68,6 @@ static int tszimm_shr(DisasContext *s, int x)
 static int tszimm_shl(DisasContext *s, int x)
 {
     return x - (8 << tszimm_esz(s, x));
-}
-
-static inline int plus1(DisasContext *s, int x)
-{
-    return x + 1;
 }
 
 /* The SH bit is in bit 8.  Extract the low 8 and shift.  */

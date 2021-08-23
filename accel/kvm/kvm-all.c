@@ -411,7 +411,7 @@ static int do_kvm_destroy_vcpu(CPUState *cpu)
     }
 
     if (cpu->kvm_dirty_gfns) {
-        ret = munmap(cpu->kvm_dirty_gfns, s->kvm_dirty_ring_size);
+        ret = munmap(cpu->kvm_dirty_gfns, s->kvm_dirty_ring_bytes);
         if (ret < 0) {
             goto err;
         }
@@ -495,7 +495,7 @@ int kvm_init_vcpu(CPUState *cpu, Error **errp)
 
     if (s->kvm_dirty_ring_size) {
         /* Use MAP_SHARED to share pages with the kernel */
-        cpu->kvm_dirty_gfns = mmap(NULL, s->kvm_dirty_ring_size,
+        cpu->kvm_dirty_gfns = mmap(NULL, s->kvm_dirty_ring_bytes,
                                    PROT_READ | PROT_WRITE, MAP_SHARED,
                                    cpu->kvm_fd,
                                    PAGE_SIZE * KVM_DIRTY_LOG_PAGE_OFFSET);
@@ -2396,6 +2396,12 @@ static int kvm_init(MachineState *ms)
             fprintf(stderr,
                     "- for kernels supporting the vm.allocate_pgste sysctl, "
                     "whether it is enabled\n");
+        }
+#elif defined(TARGET_PPC)
+        if (ret == -EINVAL) {
+            fprintf(stderr,
+                    "PPC KVM module is not loaded. Try modprobe kvm_%s.\n",
+                    (type == 2) ? "pr" : "hv");
         }
 #endif
         goto err;

@@ -237,9 +237,7 @@ static int parse_uri(const char *filename, QDict *options, Error **errp)
     return 0;
 
  err:
-    if (uri) {
-      uri_free(uri);
-    }
+    uri_free(uri);
     return -EINVAL;
 }
 
@@ -442,6 +440,9 @@ static int check_host_key(BDRVSSHState *s, SshHostKeyCheck *hkc, Error **errp)
         } else if (hkc->u.hash.type == SSH_HOST_KEY_CHECK_HASH_TYPE_SHA1) {
             return check_host_key_hash(s, hkc->u.hash.hash,
                                        SSH_PUBLICKEY_HASH_SHA1, errp);
+        } else if (hkc->u.hash.type == SSH_HOST_KEY_CHECK_HASH_TYPE_SHA256) {
+            return check_host_key_hash(s, hkc->u.hash.hash,
+                                       SSH_PUBLICKEY_HASH_SHA256, errp);
         }
         g_assert_not_reached();
         break;

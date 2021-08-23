@@ -177,6 +177,16 @@ void arm_translate_init(void);
 void arm_cpu_synchronize_from_tb(CPUState *cs, const TranslationBlock *tb);
 #endif /* CONFIG_TCG */
 
+/**
+ * aarch64_sve_zcr_get_valid_len:
+ * @cpu: cpu context
+ * @start_len: maximum len to consider
+ *
+ * Return the maximum supported sve vector length <= @start_len.
+ * Note that both @start_len and the return value are in units
+ * of ZCR_ELx.LEN, so the vector bit length is (x + 1) * 128.
+ */
+uint32_t aarch64_sve_zcr_get_valid_len(ARMCPU *cpu, uint32_t start_len);
 
 enum arm_fprounding {
     FPROUNDING_TIEEVEN,
@@ -281,6 +291,9 @@ void hw_breakpoint_update(ARMCPU *cpu, int n);
  * suitable for use after migration or on reset.
  */
 void hw_breakpoint_update_all(ARMCPU *cpu);
+
+/* Callback function for checking if a breakpoint should trigger. */
+bool arm_debug_check_breakpoint(CPUState *cs);
 
 /* Callback function for checking if a watchpoint should trigger. */
 bool arm_debug_check_watchpoint(CPUState *cs, CPUWatchpoint *wp);
@@ -1201,5 +1214,16 @@ static inline uint64_t useronly_maybe_clean_ptr(uint32_t desc, uint64_t ptr)
 #endif
     return ptr;
 }
+
+/* Values for M-profile PSR.ECI for MVE insns */
+enum MVEECIState {
+    ECI_NONE = 0, /* No completed beats */
+    ECI_A0 = 1, /* Completed: A0 */
+    ECI_A0A1 = 2, /* Completed: A0, A1 */
+    /* 3 is reserved */
+    ECI_A0A1A2 = 4, /* Completed: A0, A1, A2 */
+    ECI_A0A1A2B0 = 5, /* Completed: A0, A1, A2, B0 */
+    /* All other values reserved */
+};
 
 #endif

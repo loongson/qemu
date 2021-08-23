@@ -255,14 +255,19 @@ CommandLineOptionInfoList *qmp_query_command_line_options(bool has_option,
             info->option = g_strdup(vm_config_groups[i]->name);
             if (!strcmp("drive", vm_config_groups[i]->name)) {
                 info->parameters = get_drive_infolist();
-            } else if (!strcmp("machine", vm_config_groups[i]->name)) {
-                info->parameters = query_option_descs(machine_opts.desc);
             } else {
                 info->parameters =
                     query_option_descs(vm_config_groups[i]->desc);
             }
             QAPI_LIST_PREPEND(conf_list, info);
         }
+    }
+
+    if (!has_option || !strcmp(option, "machine")) {
+        info = g_malloc0(sizeof(*info));
+        info->option = g_strdup("machine");
+        info->parameters = query_option_descs(machine_opts.desc);
+        QAPI_LIST_PREPEND(conf_list, info);
     }
 
     if (conf_list == NULL) {
@@ -414,44 +419,30 @@ static int qemu_config_foreach(FILE *fp, QEMUConfigCB *cb, void *opaque,
     if (ferror(fp)) {
         loc_pop(&loc);
         error_setg_errno(errp, errno, "Cannot read config file");
-        return res;
+        goto out_no_loc;
     }
     res = count;
-out:
     if (qdict) {
         cb(group, qdict, opaque, errp);
-        qobject_unref(qdict);
     }
+out:
     loc_pop(&loc);
+out_no_loc:
+    qobject_unref(qdict);
     return res;
 }
 
 void qemu_config_do_parse(const char *group, QDict *qdict, void *opaque, Error **errp)
 {
     QemuOptsList **lists = opaque;
-    const char *id = qdict_get_try_str(qdict, "id");
     QemuOptsList *list;
-    QemuOpts *opts;
-    const QDictEntry *unrecognized;
 
     list = find_list(lists, group, errp);
     if (!list) {
         return;
     }
 
-    opts = qemu_opts_create(list, id, 1, errp);
-    if (!opts) {
-        return;
-    }
-    if (!qemu_opts_absorb_qdict(opts, qdict, errp)) {
-        qemu_opts_del(opts);
-        return;
-    }
-    unrecognized = qdict_first(qdict);
-    if (unrecognized) {
-        error_setg(errp, QERR_INVALID_PARAMETER, unrecognized->key);
-        qemu_opts_del(opts);
-    }
+    qemu_opts_from_qdict(list, qdict, errp);
 }
 
 int qemu_config_parse(FILE *fp, QemuOptsList **lists, const char *fname, Error **errp)

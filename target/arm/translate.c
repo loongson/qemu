@@ -34,7 +34,6 @@
 #include "exec/helper-proto.h"
 #include "exec/helper-gen.h"
 
-#include "trace-tcg.h"
 #include "exec/log.h"
 
 
@@ -88,6 +87,76 @@ void arm_translate_init(void)
         offsetof(CPUARMState, exclusive_val), "exclusive_val");
 
     a64_translate_init();
+}
+
+uint64_t asimd_imm_const(uint32_t imm, int cmode, int op)
+{
+    /* Expand the encoded constant as per AdvSIMDExpandImm pseudocode */
+    switch (cmode) {
+    case 0: case 1:
+        /* no-op */
+        break;
+    case 2: case 3:
+        imm <<= 8;
+        break;
+    case 4: case 5:
+        imm <<= 16;
+        break;
+    case 6: case 7:
+        imm <<= 24;
+        break;
+    case 8: case 9:
+        imm |= imm << 16;
+        break;
+    case 10: case 11:
+        imm = (imm << 8) | (imm << 24);
+        break;
+    case 12:
+        imm = (imm << 8) | 0xff;
+        break;
+    case 13:
+        imm = (imm << 16) | 0xffff;
+        break;
+    case 14:
+        if (op) {
+            /*
+             * This and cmode == 15 op == 1 are the only cases where
+             * the top and bottom 32 bits of the encoded constant differ.
+             */
+            uint64_t imm64 = 0;
+            int n;
+
+            for (n = 0; n < 8; n++) {
+                if (imm & (1 << n)) {
+                    imm64 |= (0xffULL << (n * 8));
+                }
+            }
+            return imm64;
+        }
+        imm |= (imm << 8) | (imm << 16) | (imm << 24);
+        break;
+    case 15:
+        if (op) {
+            /* Reserved encoding for AArch32; valid for AArch64 */
+            uint64_t imm64 = (uint64_t)(imm & 0x3f) << 48;
+            if (imm & 0x80) {
+                imm64 |= 0x8000000000000000ULL;
+            }
+            if (imm & 0x40) {
+                imm64 |= 0x3fc0000000000000ULL;
+            } else {
+                imm64 |= 0x4000000000000000ULL;
+            }
+            return imm64;
+        }
+        imm = ((imm & 0x80) << 24) | ((imm & 0x3f) << 19)
+            | ((imm & 0x40) ? (0x1f << 25) : (1 << 30));
+        break;
+    }
+    if (op) {
+        imm = ~imm;
+    }
+    return dup_const(MO_32, imm);
 }
 
 /* Generate a label used for skipping this instruction */
@@ -222,6 +291,9 @@ void store_reg(DisasContext *s, int reg, TCGv_i32 var)
          */
         tcg_gen_andi_i32(var, var, s->thumb ? ~1 : ~3);
         s->base.is_jmp = DISAS_JUMP;
+    } else if (reg == 13 && arm_dc_feature(s, ARM_FEATURE_M)) {
+        /* For M-profile SP bits [1:0] are always zero */
+        tcg_gen_andi_i32(var, var, ~3);
     }
     tcg_gen_mov_i32(cpu_R[reg], var);
     tcg_temp_free_i32(var);
@@ -309,6 +381,19 @@ static inline bool is_singlestepping(DisasContext *s)
     return s->base.singlestep_enabled || s->ss_active;
 }
 
+void clear_eci_state(DisasContext *s)
+{
+    /*
+     * Clear any ECI/ICI state: used when a load multiple/store
+     * multiple insn executes.
+     */
+    if (s->eci) {
+        TCGv_i32 tmp = tcg_const_i32(0);
+        store_cpu_field(tmp, condexec_bits);
+        s->eci = 0;
+    }
+}
+
 static void gen_smul_dual(TCGv_i32 a, TCGv_i32 b)
 {
     TCGv_i32 tmp1 = tcg_temp_new_i32();
@@ -341,9 +426,7 @@ void gen_rev16(TCGv_i32 dest, TCGv_i32 var)
 /* Byteswap low halfword and sign extend.  */
 static void gen_revsh(TCGv_i32 dest, TCGv_i32 var)
 {
-    tcg_gen_ext16u_i32(var, var);
-    tcg_gen_bswap16_i32(var, var);
-    tcg_gen_ext16s_i32(dest, var);
+    tcg_gen_bswap16_i32(var, var, TCG_BSWAP_OS);
 }
 
 /* Dual 16-bit add.  Result placed in t0 and t1 is marked as dead.
@@ -2498,16 +2581,6 @@ static int disas_dsp_insn(DisasContext *s, uint32_t insn)
     return 1;
 }
 
-static inline bool use_goto_tb(DisasContext *s, target_ulong dest)
-{
-#ifndef CONFIG_USER_ONLY
-    return (s->base.tb->pc & TARGET_PAGE_MASK) == (dest & TARGET_PAGE_MASK) ||
-           ((s->base.pc_next - 1) & TARGET_PAGE_MASK) == (dest & TARGET_PAGE_MASK);
-#else
-    return true;
-#endif
-}
-
 static void gen_goto_ptr(void)
 {
     tcg_gen_lookup_and_goto_ptr();
@@ -2519,7 +2592,7 @@ static void gen_goto_ptr(void)
  */
 static void gen_goto_tb(DisasContext *s, int n, target_ulong dest)
 {
-    if (use_goto_tb(s, dest)) {
+    if (translator_use_goto_tb(&s->base, dest)) {
         tcg_gen_goto_tb(n);
         gen_set_pc_im(s, dest);
         tcg_gen_exit_tb(s->base.tb, n);
@@ -3137,8 +3210,14 @@ static void gen_srshr16_i64(TCGv_i64 d, TCGv_i64 a, int64_t sh)
 
 static void gen_srshr32_i32(TCGv_i32 d, TCGv_i32 a, int32_t sh)
 {
-    TCGv_i32 t = tcg_temp_new_i32();
+    TCGv_i32 t;
 
+    /* Handle shift by the input size for the benefit of trans_SRSHR_ri */
+    if (sh == 32) {
+        tcg_gen_movi_i32(d, 0);
+        return;
+    }
+    t = tcg_temp_new_i32();
     tcg_gen_extract_i32(t, a, sh - 1, 1);
     tcg_gen_sari_i32(d, a, sh);
     tcg_gen_add_i32(d, d, t);
@@ -3338,8 +3417,14 @@ static void gen_urshr16_i64(TCGv_i64 d, TCGv_i64 a, int64_t sh)
 
 static void gen_urshr32_i32(TCGv_i32 d, TCGv_i32 a, int32_t sh)
 {
-    TCGv_i32 t = tcg_temp_new_i32();
+    TCGv_i32 t;
 
+    /* Handle shift by the input size for the benefit of trans_URSHR_ri */
+    if (sh == 32) {
+        tcg_gen_extract_i32(d, a, sh - 1, 1);
+        return;
+    }
+    t = tcg_temp_new_i32();
     tcg_gen_extract_i32(t, a, sh - 1, 1);
     tcg_gen_shri_i32(d, a, sh);
     tcg_gen_add_i32(d, d, t);
@@ -5622,6 +5707,247 @@ static bool trans_MOVT(DisasContext *s, arg_MOVW *a)
 }
 
 /*
+ * v8.1M MVE wide-shifts
+ */
+static bool do_mve_shl_ri(DisasContext *s, arg_mve_shl_ri *a,
+                          WideShiftImmFn *fn)
+{
+    TCGv_i64 rda;
+    TCGv_i32 rdalo, rdahi;
+
+    if (!arm_dc_feature(s, ARM_FEATURE_V8_1M)) {
+        /* Decode falls through to ORR/MOV UNPREDICTABLE handling */
+        return false;
+    }
+    if (a->rdahi == 15) {
+        /* These are a different encoding (SQSHL/SRSHR/UQSHL/URSHR) */
+        return false;
+    }
+    if (!dc_isar_feature(aa32_mve, s) ||
+        !arm_dc_feature(s, ARM_FEATURE_M_MAIN) ||
+        a->rdahi == 13) {
+        /* RdaHi == 13 is UNPREDICTABLE; we choose to UNDEF */
+        unallocated_encoding(s);
+        return true;
+    }
+
+    if (a->shim == 0) {
+        a->shim = 32;
+    }
+
+    rda = tcg_temp_new_i64();
+    rdalo = load_reg(s, a->rdalo);
+    rdahi = load_reg(s, a->rdahi);
+    tcg_gen_concat_i32_i64(rda, rdalo, rdahi);
+
+    fn(rda, rda, a->shim);
+
+    tcg_gen_extrl_i64_i32(rdalo, rda);
+    tcg_gen_extrh_i64_i32(rdahi, rda);
+    store_reg(s, a->rdalo, rdalo);
+    store_reg(s, a->rdahi, rdahi);
+    tcg_temp_free_i64(rda);
+
+    return true;
+}
+
+static bool trans_ASRL_ri(DisasContext *s, arg_mve_shl_ri *a)
+{
+    return do_mve_shl_ri(s, a, tcg_gen_sari_i64);
+}
+
+static bool trans_LSLL_ri(DisasContext *s, arg_mve_shl_ri *a)
+{
+    return do_mve_shl_ri(s, a, tcg_gen_shli_i64);
+}
+
+static bool trans_LSRL_ri(DisasContext *s, arg_mve_shl_ri *a)
+{
+    return do_mve_shl_ri(s, a, tcg_gen_shri_i64);
+}
+
+static void gen_mve_sqshll(TCGv_i64 r, TCGv_i64 n, int64_t shift)
+{
+    gen_helper_mve_sqshll(r, cpu_env, n, tcg_constant_i32(shift));
+}
+
+static bool trans_SQSHLL_ri(DisasContext *s, arg_mve_shl_ri *a)
+{
+    return do_mve_shl_ri(s, a, gen_mve_sqshll);
+}
+
+static void gen_mve_uqshll(TCGv_i64 r, TCGv_i64 n, int64_t shift)
+{
+    gen_helper_mve_uqshll(r, cpu_env, n, tcg_constant_i32(shift));
+}
+
+static bool trans_UQSHLL_ri(DisasContext *s, arg_mve_shl_ri *a)
+{
+    return do_mve_shl_ri(s, a, gen_mve_uqshll);
+}
+
+static bool trans_SRSHRL_ri(DisasContext *s, arg_mve_shl_ri *a)
+{
+    return do_mve_shl_ri(s, a, gen_srshr64_i64);
+}
+
+static bool trans_URSHRL_ri(DisasContext *s, arg_mve_shl_ri *a)
+{
+    return do_mve_shl_ri(s, a, gen_urshr64_i64);
+}
+
+static bool do_mve_shl_rr(DisasContext *s, arg_mve_shl_rr *a, WideShiftFn *fn)
+{
+    TCGv_i64 rda;
+    TCGv_i32 rdalo, rdahi;
+
+    if (!arm_dc_feature(s, ARM_FEATURE_V8_1M)) {
+        /* Decode falls through to ORR/MOV UNPREDICTABLE handling */
+        return false;
+    }
+    if (a->rdahi == 15) {
+        /* These are a different encoding (SQSHL/SRSHR/UQSHL/URSHR) */
+        return false;
+    }
+    if (!dc_isar_feature(aa32_mve, s) ||
+        !arm_dc_feature(s, ARM_FEATURE_M_MAIN) ||
+        a->rdahi == 13 || a->rm == 13 || a->rm == 15 ||
+        a->rm == a->rdahi || a->rm == a->rdalo) {
+        /* These rdahi/rdalo/rm cases are UNPREDICTABLE; we choose to UNDEF */
+        unallocated_encoding(s);
+        return true;
+    }
+
+    rda = tcg_temp_new_i64();
+    rdalo = load_reg(s, a->rdalo);
+    rdahi = load_reg(s, a->rdahi);
+    tcg_gen_concat_i32_i64(rda, rdalo, rdahi);
+
+    /* The helper takes care of the sign-extension of the low 8 bits of Rm */
+    fn(rda, cpu_env, rda, cpu_R[a->rm]);
+
+    tcg_gen_extrl_i64_i32(rdalo, rda);
+    tcg_gen_extrh_i64_i32(rdahi, rda);
+    store_reg(s, a->rdalo, rdalo);
+    store_reg(s, a->rdahi, rdahi);
+    tcg_temp_free_i64(rda);
+
+    return true;
+}
+
+static bool trans_LSLL_rr(DisasContext *s, arg_mve_shl_rr *a)
+{
+    return do_mve_shl_rr(s, a, gen_helper_mve_ushll);
+}
+
+static bool trans_ASRL_rr(DisasContext *s, arg_mve_shl_rr *a)
+{
+    return do_mve_shl_rr(s, a, gen_helper_mve_sshrl);
+}
+
+static bool trans_UQRSHLL64_rr(DisasContext *s, arg_mve_shl_rr *a)
+{
+    return do_mve_shl_rr(s, a, gen_helper_mve_uqrshll);
+}
+
+static bool trans_SQRSHRL64_rr(DisasContext *s, arg_mve_shl_rr *a)
+{
+    return do_mve_shl_rr(s, a, gen_helper_mve_sqrshrl);
+}
+
+static bool trans_UQRSHLL48_rr(DisasContext *s, arg_mve_shl_rr *a)
+{
+    return do_mve_shl_rr(s, a, gen_helper_mve_uqrshll48);
+}
+
+static bool trans_SQRSHRL48_rr(DisasContext *s, arg_mve_shl_rr *a)
+{
+    return do_mve_shl_rr(s, a, gen_helper_mve_sqrshrl48);
+}
+
+static bool do_mve_sh_ri(DisasContext *s, arg_mve_sh_ri *a, ShiftImmFn *fn)
+{
+    if (!arm_dc_feature(s, ARM_FEATURE_V8_1M)) {
+        /* Decode falls through to ORR/MOV UNPREDICTABLE handling */
+        return false;
+    }
+    if (!dc_isar_feature(aa32_mve, s) ||
+        !arm_dc_feature(s, ARM_FEATURE_M_MAIN) ||
+        a->rda == 13 || a->rda == 15) {
+        /* These rda cases are UNPREDICTABLE; we choose to UNDEF */
+        unallocated_encoding(s);
+        return true;
+    }
+
+    if (a->shim == 0) {
+        a->shim = 32;
+    }
+    fn(cpu_R[a->rda], cpu_R[a->rda], a->shim);
+
+    return true;
+}
+
+static bool trans_URSHR_ri(DisasContext *s, arg_mve_sh_ri *a)
+{
+    return do_mve_sh_ri(s, a, gen_urshr32_i32);
+}
+
+static bool trans_SRSHR_ri(DisasContext *s, arg_mve_sh_ri *a)
+{
+    return do_mve_sh_ri(s, a, gen_srshr32_i32);
+}
+
+static void gen_mve_sqshl(TCGv_i32 r, TCGv_i32 n, int32_t shift)
+{
+    gen_helper_mve_sqshl(r, cpu_env, n, tcg_constant_i32(shift));
+}
+
+static bool trans_SQSHL_ri(DisasContext *s, arg_mve_sh_ri *a)
+{
+    return do_mve_sh_ri(s, a, gen_mve_sqshl);
+}
+
+static void gen_mve_uqshl(TCGv_i32 r, TCGv_i32 n, int32_t shift)
+{
+    gen_helper_mve_uqshl(r, cpu_env, n, tcg_constant_i32(shift));
+}
+
+static bool trans_UQSHL_ri(DisasContext *s, arg_mve_sh_ri *a)
+{
+    return do_mve_sh_ri(s, a, gen_mve_uqshl);
+}
+
+static bool do_mve_sh_rr(DisasContext *s, arg_mve_sh_rr *a, ShiftFn *fn)
+{
+    if (!arm_dc_feature(s, ARM_FEATURE_V8_1M)) {
+        /* Decode falls through to ORR/MOV UNPREDICTABLE handling */
+        return false;
+    }
+    if (!dc_isar_feature(aa32_mve, s) ||
+        !arm_dc_feature(s, ARM_FEATURE_M_MAIN) ||
+        a->rda == 13 || a->rda == 15 || a->rm == 13 || a->rm == 15 ||
+        a->rm == a->rda) {
+        /* These rda/rm cases are UNPREDICTABLE; we choose to UNDEF */
+        unallocated_encoding(s);
+        return true;
+    }
+
+    /* The helper takes care of the sign-extension of the low 8 bits of Rm */
+    fn(cpu_R[a->rda], cpu_env, cpu_R[a->rda], cpu_R[a->rm]);
+    return true;
+}
+
+static bool trans_SQRSHR_rr(DisasContext *s, arg_mve_sh_rr *a)
+{
+    return do_mve_sh_rr(s, a, gen_helper_mve_sqrshr);
+}
+
+static bool trans_UQRSHL_rr(DisasContext *s, arg_mve_sh_rr *a)
+{
+    return do_mve_sh_rr(s, a, gen_helper_mve_uqrshl);
+}
+
+/*
  * Multiply and multiply accumulate
  */
 
@@ -6203,6 +6529,8 @@ static bool trans_BKPT(DisasContext *s, arg_BKPT *a)
     if (!ENABLE_ARCH_5) {
         return false;
     }
+    /* BKPT is OK with ECI set and leaves it untouched */
+    s->eci_handled = true;
     if (arm_dc_feature(s, ARM_FEATURE_M) &&
         semihosting_enabled() &&
 #ifndef CONFIG_USER_ONLY
@@ -7767,6 +8095,8 @@ static bool op_stm(DisasContext *s, arg_ldst_block *a, int min_n)
         return true;
     }
 
+    s->eci_handled = true;
+
     addr = op_addr_block_pre(s, a, n);
     mem_idx = get_mem_index(s);
 
@@ -7793,6 +8123,7 @@ static bool op_stm(DisasContext *s, arg_ldst_block *a, int min_n)
     }
 
     op_addr_block_post(s, a, addr, n);
+    clear_eci_state(s);
     return true;
 }
 
@@ -7847,6 +8178,8 @@ static bool do_ldm(DisasContext *s, arg_ldst_block *a, int min_n)
         return true;
     }
 
+    s->eci_handled = true;
+
     addr = op_addr_block_pre(s, a, n);
     mem_idx = get_mem_index(s);
     loaded_base = false;
@@ -7897,6 +8230,7 @@ static bool do_ldm(DisasContext *s, arg_ldst_block *a, int min_n)
         /* Must exit loop to check un-masked IRQs */
         s->base.is_jmp = DISAS_EXIT;
     }
+    clear_eci_state(s);
     return true;
 }
 
@@ -7952,6 +8286,8 @@ static bool trans_CLRM(DisasContext *s, arg_CLRM *a)
         return false;
     }
 
+    s->eci_handled = true;
+
     zero = tcg_const_i32(0);
     for (i = 0; i < 15; i++) {
         if (extract32(a->list, i, 1)) {
@@ -7969,6 +8305,7 @@ static bool trans_CLRM(DisasContext *s, arg_CLRM *a)
         tcg_temp_free_i32(maskreg);
     }
     tcg_temp_free_i32(zero);
+    clear_eci_state(s);
     return true;
 }
 
@@ -8090,13 +8427,32 @@ static bool trans_DLS(DisasContext *s, arg_DLS *a)
         return false;
     }
     if (a->rn == 13 || a->rn == 15) {
-        /* CONSTRAINED UNPREDICTABLE: we choose to UNDEF */
+        /*
+         * For DLSTP rn == 15 is a related encoding (LCTP); the
+         * other cases caught by this condition are all
+         * CONSTRAINED UNPREDICTABLE: we choose to UNDEF
+         */
         return false;
     }
 
-    /* Not a while loop, no tail predication: just set LR to the count */
+    if (a->size != 4) {
+        /* DLSTP */
+        if (!dc_isar_feature(aa32_mve, s)) {
+            return false;
+        }
+        if (!vfp_access_check(s)) {
+            return true;
+        }
+    }
+
+    /* Not a while loop: set LR to the count, and set LTPSIZE for DLSTP */
     tmp = load_reg(s, a->rn);
     store_reg(s, 14, tmp);
+    if (a->size != 4) {
+        /* DLSTP: set FPSCR.LTPSIZE */
+        tmp = tcg_const_i32(a->size);
+        store_cpu_field(tmp, v7m.ltpsize);
+    }
     return true;
 }
 
@@ -8110,7 +8466,11 @@ static bool trans_WLS(DisasContext *s, arg_WLS *a)
         return false;
     }
     if (a->rn == 13 || a->rn == 15) {
-        /* CONSTRAINED UNPREDICTABLE: we choose to UNDEF */
+        /*
+         * For WLSTP rn == 15 is a related encoding (LE); the
+         * other cases caught by this condition are all
+         * CONSTRAINED UNPREDICTABLE: we choose to UNDEF
+         */
         return false;
     }
     if (s->condexec_mask) {
@@ -8123,10 +8483,41 @@ static bool trans_WLS(DisasContext *s, arg_WLS *a)
          */
         return false;
     }
+    if (a->size != 4) {
+        /* WLSTP */
+        if (!dc_isar_feature(aa32_mve, s)) {
+            return false;
+        }
+        /*
+         * We need to check that the FPU is enabled here, but mustn't
+         * call vfp_access_check() to do that because we don't want to
+         * do the lazy state preservation in the "loop count is zero" case.
+         * Do the check-and-raise-exception by hand.
+         */
+        if (s->fp_excp_el) {
+            gen_exception_insn(s, s->pc_curr, EXCP_NOCP,
+                               syn_uncategorized(), s->fp_excp_el);
+            return true;
+        }
+    }
+
     nextlabel = gen_new_label();
     tcg_gen_brcondi_i32(TCG_COND_EQ, cpu_R[a->rn], 0, nextlabel);
     tmp = load_reg(s, a->rn);
     store_reg(s, 14, tmp);
+    if (a->size != 4) {
+        /*
+         * WLSTP: set FPSCR.LTPSIZE. This requires that we do the
+         * lazy state preservation, new FP context creation, etc,
+         * that vfp_access_check() does. We know that the actual
+         * access check will succeed (ie it won't generate code that
+         * throws an exception) because we did that check by hand earlier.
+         */
+        bool ok = vfp_access_check(s);
+        assert(ok);
+        tmp = tcg_const_i32(a->size);
+        store_cpu_field(tmp, v7m.ltpsize);
+    }
     gen_jmp_tb(s, s->base.pc_next, 1);
 
     gen_set_label(nextlabel);
@@ -8145,24 +8536,139 @@ static bool trans_LE(DisasContext *s, arg_LE *a)
      * any faster.
      */
     TCGv_i32 tmp;
+    TCGLabel *loopend;
+    bool fpu_active;
 
     if (!dc_isar_feature(aa32_lob, s)) {
         return false;
     }
+    if (a->f && a->tp) {
+        return false;
+    }
+    if (s->condexec_mask) {
+        /*
+         * LE in an IT block is CONSTRAINED UNPREDICTABLE;
+         * we choose to UNDEF, because otherwise our use of
+         * gen_goto_tb(1) would clash with the use of TB exit 1
+         * in the dc->condjmp condition-failed codepath in
+         * arm_tr_tb_stop() and we'd get an assertion.
+         */
+        return false;
+    }
+    if (a->tp) {
+        /* LETP */
+        if (!dc_isar_feature(aa32_mve, s)) {
+            return false;
+        }
+        if (!vfp_access_check(s)) {
+            s->eci_handled = true;
+            return true;
+        }
+    }
 
-    if (!a->f) {
-        /* Not loop-forever. If LR <= 1 this is the last loop: do nothing. */
-        arm_gen_condlabel(s);
-        tcg_gen_brcondi_i32(TCG_COND_LEU, cpu_R[14], 1, s->condlabel);
-        /* Decrement LR */
-        tmp = load_reg(s, 14);
-        tcg_gen_addi_i32(tmp, tmp, -1);
-        store_reg(s, 14, tmp);
+    /* LE/LETP is OK with ECI set and leaves it untouched */
+    s->eci_handled = true;
+
+    /*
+     * With MVE, LTPSIZE might not be 4, and we must emit an INVSTATE
+     * UsageFault exception for the LE insn in that case. Note that we
+     * are not directly checking FPSCR.LTPSIZE but instead check the
+     * pseudocode LTPSIZE() function, which returns 4 if the FPU is
+     * not currently active (ie ActiveFPState() returns false). We
+     * can identify not-active purely from our TB state flags, as the
+     * FPU is active only if:
+     *  the FPU is enabled
+     *  AND lazy state preservation is not active
+     *  AND we do not need a new fp context (this is the ASPEN/FPCA check)
+     *
+     * Usually we don't need to care about this distinction between
+     * LTPSIZE and FPSCR.LTPSIZE, because the code in vfp_access_check()
+     * will either take an exception or clear the conditions that make
+     * the FPU not active. But LE is an unusual case of a non-FP insn
+     * that looks at LTPSIZE.
+     */
+    fpu_active = !s->fp_excp_el && !s->v7m_lspact && !s->v7m_new_fp_ctxt_needed;
+
+    if (!a->tp && dc_isar_feature(aa32_mve, s) && fpu_active) {
+        /* Need to do a runtime check for LTPSIZE != 4 */
+        TCGLabel *skipexc = gen_new_label();
+        tmp = load_cpu_field(v7m.ltpsize);
+        tcg_gen_brcondi_i32(TCG_COND_EQ, tmp, 4, skipexc);
+        tcg_temp_free_i32(tmp);
+        gen_exception_insn(s, s->pc_curr, EXCP_INVSTATE, syn_uncategorized(),
+                           default_exception_el(s));
+        gen_set_label(skipexc);
+    }
+
+    if (a->f) {
+        /* Loop-forever: just jump back to the loop start */
+        gen_jmp(s, read_pc(s) - a->imm);
+        return true;
+    }
+
+    /*
+     * Not loop-forever. If LR <= loop-decrement-value this is the last loop.
+     * For LE, we know at this point that LTPSIZE must be 4 and the
+     * loop decrement value is 1. For LETP we need to calculate the decrement
+     * value from LTPSIZE.
+     */
+    loopend = gen_new_label();
+    if (!a->tp) {
+        tcg_gen_brcondi_i32(TCG_COND_LEU, cpu_R[14], 1, loopend);
+        tcg_gen_addi_i32(cpu_R[14], cpu_R[14], -1);
+    } else {
+        /*
+         * Decrement by 1 << (4 - LTPSIZE). We need to use a TCG local
+         * so that decr stays live after the brcondi.
+         */
+        TCGv_i32 decr = tcg_temp_local_new_i32();
+        TCGv_i32 ltpsize = load_cpu_field(v7m.ltpsize);
+        tcg_gen_sub_i32(decr, tcg_constant_i32(4), ltpsize);
+        tcg_gen_shl_i32(decr, tcg_constant_i32(1), decr);
+        tcg_temp_free_i32(ltpsize);
+
+        tcg_gen_brcond_i32(TCG_COND_LEU, cpu_R[14], decr, loopend);
+
+        tcg_gen_sub_i32(cpu_R[14], cpu_R[14], decr);
+        tcg_temp_free_i32(decr);
     }
     /* Jump back to the loop start */
     gen_jmp(s, read_pc(s) - a->imm);
+
+    gen_set_label(loopend);
+    if (a->tp) {
+        /* Exits from tail-pred loops must reset LTPSIZE to 4 */
+        tmp = tcg_const_i32(4);
+        store_cpu_field(tmp, v7m.ltpsize);
+    }
+    /* End TB, continuing to following insn */
+    gen_jmp_tb(s, s->base.pc_next, 1);
     return true;
 }
+
+static bool trans_LCTP(DisasContext *s, arg_LCTP *a)
+{
+    /*
+     * M-profile Loop Clear with Tail Predication. Since our implementation
+     * doesn't cache branch information, all we need to do is reset
+     * FPSCR.LTPSIZE to 4.
+     */
+    TCGv_i32 ltpsize;
+
+    if (!dc_isar_feature(aa32_lob, s) ||
+        !dc_isar_feature(aa32_mve, s)) {
+        return false;
+    }
+
+    if (!vfp_access_check(s)) {
+        return true;
+    }
+
+    ltpsize = tcg_const_i32(4);
+    store_cpu_field(ltpsize, v7m.ltpsize);
+    return true;
+}
+
 
 static bool op_tbranch(DisasContext *s, arg_tbranch *a, bool half)
 {
@@ -8391,7 +8897,7 @@ static bool trans_ISB(DisasContext *s, arg_ISB *a)
      * self-modifying code correctly and also to take
      * any pending interrupts immediately.
      */
-    gen_goto_tb(s, 0, s->base.pc_next);
+    s->base.is_jmp = DISAS_TOO_MANY;
     return true;
 }
 
@@ -8405,7 +8911,7 @@ static bool trans_SB(DisasContext *s, arg_SB *a)
      * for TCG; MB and end the TB instead.
      */
     tcg_gen_mb(TCG_MO_ALL | TCG_BAR_SC);
-    gen_goto_tb(s, 0, s->base.pc_next);
+    s->base.is_jmp = DISAS_TOO_MANY;
     return true;
 }
 
@@ -8726,6 +9232,7 @@ static void disas_thumb2_insn(DisasContext *s, uint32_t insn)
     if (disas_t32(s, insn) ||
         disas_vfp_uncond(s, insn) ||
         disas_neon_shared(s, insn) ||
+        disas_mve(s, insn) ||
         ((insn >> 28) == 0xe && disas_vfp(s, insn))) {
         return;
     }
@@ -8775,8 +9282,28 @@ static void arm_tr_init_disas_context(DisasContextBase *dcbase, CPUState *cs)
     dc->thumb = EX_TBFLAG_AM32(tb_flags, THUMB);
     dc->be_data = EX_TBFLAG_ANY(tb_flags, BE_DATA) ? MO_BE : MO_LE;
     condexec = EX_TBFLAG_AM32(tb_flags, CONDEXEC);
-    dc->condexec_mask = (condexec & 0xf) << 1;
-    dc->condexec_cond = condexec >> 4;
+    /*
+     * the CONDEXEC TB flags are CPSR bits [15:10][26:25]. On A-profile this
+     * is always the IT bits. On M-profile, some of the reserved encodings
+     * of IT are used instead to indicate either ICI or ECI, which
+     * indicate partial progress of a restartable insn that was interrupted
+     * partway through by an exception:
+     *  * if CONDEXEC[3:0] != 0b0000 : CONDEXEC is IT bits
+     *  * if CONDEXEC[3:0] == 0b0000 : CONDEXEC is ICI or ECI bits
+     * In all cases CONDEXEC == 0 means "not in IT block or restartable
+     * insn, behave normally".
+     */
+    dc->eci = dc->condexec_mask = dc->condexec_cond = 0;
+    dc->eci_handled = false;
+    dc->insn_eci_rewind = NULL;
+    if (condexec & 0xf) {
+        dc->condexec_mask = (condexec & 0xf) << 1;
+        dc->condexec_cond = condexec >> 4;
+    } else {
+        if (arm_feature(env, ARM_FEATURE_M)) {
+            dc->eci = condexec >> 4;
+        }
+    }
 
     core_mmu_idx = EX_TBFLAG_ANY(tb_flags, MMUIDX);
     dc->mmu_idx = core_to_arm_mmu_idx(env, core_mmu_idx);
@@ -8898,38 +9425,20 @@ static void arm_tr_tb_start(DisasContextBase *dcbase, CPUState *cpu)
 static void arm_tr_insn_start(DisasContextBase *dcbase, CPUState *cpu)
 {
     DisasContext *dc = container_of(dcbase, DisasContext, base);
+    /*
+     * The ECI/ICI bits share PSR bits with the IT bits, so we
+     * need to reconstitute the bits from the split-out DisasContext
+     * fields here.
+     */
+    uint32_t condexec_bits;
 
-    tcg_gen_insn_start(dc->base.pc_next,
-                       (dc->condexec_cond << 4) | (dc->condexec_mask >> 1),
-                       0);
-    dc->insn_start = tcg_last_op();
-}
-
-static bool arm_tr_breakpoint_check(DisasContextBase *dcbase, CPUState *cpu,
-                                    const CPUBreakpoint *bp)
-{
-    DisasContext *dc = container_of(dcbase, DisasContext, base);
-
-    if (bp->flags & BP_CPU) {
-        gen_set_condexec(dc);
-        gen_set_pc_im(dc, dc->base.pc_next);
-        gen_helper_check_breakpoints(cpu_env);
-        /* End the TB early; it's likely not going to be executed */
-        dc->base.is_jmp = DISAS_TOO_MANY;
+    if (dc->eci) {
+        condexec_bits = dc->eci << 4;
     } else {
-        gen_exception_internal_insn(dc, dc->base.pc_next, EXCP_DEBUG);
-        /* The address covered by the breakpoint must be
-           included in [tb->pc, tb->pc + tb->size) in order
-           to for it to be properly cleared -- thus we
-           increment the PC here so that the logic setting
-           tb->size below does the right thing.  */
-        /* TODO: Advance PC by correct instruction length to
-         * avoid disassembler error messages */
-        dc->base.pc_next += 2;
-        dc->base.is_jmp = DISAS_NORETURN;
+        condexec_bits = (dc->condexec_cond << 4) | (dc->condexec_mask >> 1);
     }
-
-    return true;
+    tcg_gen_insn_start(dc->base.pc_next, condexec_bits, 0);
+    dc->insn_start = tcg_last_op();
 }
 
 static bool arm_pre_translate_insn(DisasContext *dc)
@@ -9067,6 +9576,40 @@ static void thumb_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
     }
     dc->insn = insn;
 
+    if (dc->eci) {
+        /*
+         * For M-profile continuable instructions, ECI/ICI handling
+         * falls into these cases:
+         *  - interrupt-continuable instructions
+         *     These are the various load/store multiple insns (both
+         *     integer and fp). The ICI bits indicate the register
+         *     where the load/store can resume. We make the IMPDEF
+         *     choice to always do "instruction restart", ie ignore
+         *     the ICI value and always execute the ldm/stm from the
+         *     start. So all we need to do is zero PSR.ICI if the
+         *     insn executes.
+         *  - MVE instructions subject to beat-wise execution
+         *     Here the ECI bits indicate which beats have already been
+         *     executed, and we must honour this. Each insn of this
+         *     type will handle it correctly. We will update PSR.ECI
+         *     in the helper function for the insn (some ECI values
+         *     mean that the following insn also has been partially
+         *     executed).
+         *  - Special cases which don't advance ECI
+         *     The insns LE, LETP and BKPT leave the ECI/ICI state
+         *     bits untouched.
+         *  - all other insns (the common case)
+         *     Non-zero ECI/ICI means an INVSTATE UsageFault.
+         *     We place a rewind-marker here. Insns in the previous
+         *     three categories will set a flag in the DisasContext.
+         *     If the flag isn't set after we call disas_thumb_insn()
+         *     or disas_thumb2_insn() then we know we have a "some other
+         *     insn" case. We will rewind to the marker (ie throwing away
+         *     all the generated code) and instead emit "take exception".
+         */
+        dc->insn_eci_rewind = tcg_last_op();
+    }
+
     if (dc->condexec_mask && !thumb_insn_is_unconditional(dc, insn)) {
         uint32_t cond = dc->condexec_cond;
 
@@ -9093,6 +9636,17 @@ static void thumb_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
         if (dc->condexec_mask == 0) {
             dc->condexec_cond = 0;
         }
+    }
+
+    if (dc->eci && !dc->eci_handled) {
+        /*
+         * Insn wasn't valid for ECI/ICI at all: undo what we
+         * just generated and instead emit an exception
+         */
+        tcg_remove_ops_after(dc->insn_eci_rewind);
+        dc->condjmp = 0;
+        gen_exception_insn(dc, dc->pc_curr, EXCP_INVSTATE, syn_uncategorized(),
+                           default_exception_el(dc));
     }
 
     arm_post_translate_insn(dc);
@@ -9249,7 +9803,6 @@ static const TranslatorOps arm_translator_ops = {
     .init_disas_context = arm_tr_init_disas_context,
     .tb_start           = arm_tr_tb_start,
     .insn_start         = arm_tr_insn_start,
-    .breakpoint_check   = arm_tr_breakpoint_check,
     .translate_insn     = arm_tr_translate_insn,
     .tb_stop            = arm_tr_tb_stop,
     .disas_log          = arm_tr_disas_log,
@@ -9259,7 +9812,6 @@ static const TranslatorOps thumb_translator_ops = {
     .init_disas_context = arm_tr_init_disas_context,
     .tb_start           = arm_tr_tb_start,
     .insn_start         = arm_tr_insn_start,
-    .breakpoint_check   = arm_tr_breakpoint_check,
     .translate_insn     = thumb_tr_translate_insn,
     .tb_stop            = arm_tr_tb_stop,
     .disas_log          = arm_tr_disas_log,

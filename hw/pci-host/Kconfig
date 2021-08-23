@@ -6,7 +6,7 @@ config XEN_IGD_PASSTHROUGH
     default y
     depends on XEN && PCI_I440FX
 
-config PREP_PCI
+config RAVEN_PCI
     bool
     select PCI
     select OR_IRQ
@@ -76,3 +76,4 @@ config SH_PCI
 config MV64361
     bool
     select PCI
+    select I8259
