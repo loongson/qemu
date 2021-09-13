@@ -579,6 +579,8 @@ elif check_define __arm__ ; then
   cpu="arm"
 elif check_define __aarch64__ ; then
   cpu="aarch64"
+elif check_define __loongarch__ ; then
+  cpu="loongarch"
 else
   cpu=$(uname -m)
 fi
@@ -609,6 +611,9 @@ case "$cpu" in
   ;;
   sparc|sun4[cdmuv])
     cpu="sparc"
+  ;;
+  loongarch)
+    cpu="loongarch"
   ;;
   *)
     # This will result in either an error or falling back to TCI later
