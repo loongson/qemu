@@ -1,0 +1,89 @@
+#
+# LoongArch instruction decode definitions.
+#
+# Copyright (c) 2021 Loongson Technology Corporation Limited
+#
+# SPDX-License-Identifier: LGPL-2.1+
+#
+
+#
+# Fields
+#
+%rd      0:5
+%rj      5:5
+%rk      10:5
+%sa2     15:2
+%si12    10:s12
+%ui12    10:12
+%si16    10:s16
+%si20    5:s20
+
+#
+# Argument sets
+#
+&fmt_rdrjrk         rd rj rk
+&fmt_rdrjsi12       rd rj si12
+&fmt_rdrjrksa2      rd rj rk sa2
+&fmt_rdrjsi16       rd rj si16
+&fmt_rdrjui12       rd rj ui12
+&fmt_rdsi20         rd si20
+
+#
+# Formats
+#
+@fmt_rdrjrk          .... ........ ..... ..... ..... .....    &fmt_rdrjrk         %rd %rj %rk
+@fmt_rdrjsi12        .... ...... ............ ..... .....     &fmt_rdrjsi12       %rd %rj %si12
+@fmt_rdrjui12        .... ...... ............ ..... .....     &fmt_rdrjui12       %rd %rj %ui12
+@fmt_rdrjrksa2       .... ........ ... .. ..... ..... .....   &fmt_rdrjrksa2      %rd %rj %rk %sa2
+@fmt_rdrjsi16        .... .. ................ ..... .....     &fmt_rdrjsi16       %rd %rj %si16
+@fmt_rdsi20          .... ... .................... .....      &fmt_rdsi20         %rd %si20
+
+#
+# Fixed point arithmetic operation instruction
+#
+add_w            0000 00000001 00000 ..... ..... .....    @fmt_rdrjrk
+add_d            0000 00000001 00001 ..... ..... .....    @fmt_rdrjrk
+sub_w            0000 00000001 00010 ..... ..... .....    @fmt_rdrjrk
+sub_d            0000 00000001 00011 ..... ..... .....    @fmt_rdrjrk
+slt              0000 00000001 00100 ..... ..... .....    @fmt_rdrjrk
+sltu             0000 00000001 00101 ..... ..... .....    @fmt_rdrjrk
+slti             0000 001000 ............ ..... .....     @fmt_rdrjsi12
+sltui            0000 001001 ............ ..... .....     @fmt_rdrjsi12
+nor              0000 00000001 01000 ..... ..... .....    @fmt_rdrjrk
+and              0000 00000001 01001 ..... ..... .....    @fmt_rdrjrk
+or               0000 00000001 01010 ..... ..... .....    @fmt_rdrjrk
+xor              0000 00000001 01011 ..... ..... .....    @fmt_rdrjrk
+orn              0000 00000001 01100 ..... ..... .....    @fmt_rdrjrk
+andn             0000 00000001 01101 ..... ..... .....    @fmt_rdrjrk
+mul_w            0000 00000001 11000 ..... ..... .....    @fmt_rdrjrk
+mulh_w           0000 00000001 11001 ..... ..... .....    @fmt_rdrjrk
+mulh_wu          0000 00000001 11010 ..... ..... .....    @fmt_rdrjrk
+mul_d            0000 00000001 11011 ..... ..... .....    @fmt_rdrjrk
+mulh_d           0000 00000001 11100 ..... ..... .....    @fmt_rdrjrk
+mulh_du          0000 00000001 11101 ..... ..... .....    @fmt_rdrjrk
+mulw_d_w         0000 00000001 11110 ..... ..... .....    @fmt_rdrjrk
+mulw_d_wu        0000 00000001 11111 ..... ..... .....    @fmt_rdrjrk
+div_w            0000 00000010 00000 ..... ..... .....    @fmt_rdrjrk
+mod_w            0000 00000010 00001 ..... ..... .....    @fmt_rdrjrk
+div_wu           0000 00000010 00010 ..... ..... .....    @fmt_rdrjrk
+mod_wu           0000 00000010 00011 ..... ..... .....    @fmt_rdrjrk
+div_d            0000 00000010 00100 ..... ..... .....    @fmt_rdrjrk
+mod_d            0000 00000010 00101 ..... ..... .....    @fmt_rdrjrk
+div_du           0000 00000010 00110 ..... ..... .....    @fmt_rdrjrk
+mod_du           0000 00000010 00111 ..... ..... .....    @fmt_rdrjrk
+alsl_w           0000 00000000 010 .. ..... ..... .....   @fmt_rdrjrksa2
+alsl_wu          0000 00000000 011 .. ..... ..... .....   @fmt_rdrjrksa2
+alsl_d           0000 00000010 110 .. ..... ..... .....   @fmt_rdrjrksa2
+lu12i_w          0001 010 .................... .....      @fmt_rdsi20
+lu32i_d          0001 011 .................... .....      @fmt_rdsi20
+lu52i_d          0000 001100 ............ ..... .....     @fmt_rdrjsi12
+pcaddi           0001 100 .................... .....      @fmt_rdsi20
+pcalau12i        0001 101 .................... .....      @fmt_rdsi20
+pcaddu12i        0001 110 .................... .....      @fmt_rdsi20
+pcaddu18i        0001 111 .................... .....      @fmt_rdsi20
+addi_w           0000 001010 ............ ..... .....     @fmt_rdrjsi12
+addi_d           0000 001011 ............ ..... .....     @fmt_rdrjsi12
+addu16i_d        0001 00 ................ ..... .....     @fmt_rdrjsi16
+andi             0000 001101 ............ ..... .....     @fmt_rdrjui12
+ori              0000 001110 ............ ..... .....     @fmt_rdrjui12
+xori             0000 001111 ............ ..... .....     @fmt_rdrjui12
