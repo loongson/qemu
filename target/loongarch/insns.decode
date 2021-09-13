@@ -27,6 +27,7 @@
 %si14    10:s14
 %hint    0:5
 %whint   0:15
+%code    0:15
 
 #
 # Argument sets
@@ -46,6 +47,8 @@
 &fmt_rdrjsi14       rd rj si14
 &fmt_hintrjsi12     hint rj si12
 &fmt_whint          whint
+&fmt_rjrk           rj rk
+&fmt_code           code
 
 #
 # Formats
@@ -65,6 +68,8 @@
 @fmt_hintrjsi12      .... ...... ............ ..... .....     &fmt_hintrjsi12     %hint %rj %si12
 @fmt_whint           .... ........ ..... ...............      &fmt_whint          %whint
 @fmt_rdrjsi14        .... .... .............. ..... .....     &fmt_rdrjsi14       %rd %rj %si14
+@fmt_rjrk            .... ........ ..... ..... ..... .....    &fmt_rjrk           %rj %rk
+@fmt_code            .... ........ ..... ...............      &fmt_code           %code
 
 #
 # Fixed point arithmetic operation instruction
@@ -260,3 +265,23 @@ ammax_db_wu      0011 10000111 00000 ..... ..... .....    @fmt_rdrjrk
 ammax_db_du      0011 10000111 00001 ..... ..... .....    @fmt_rdrjrk
 ammin_db_wu      0011 10000111 00010 ..... ..... .....    @fmt_rdrjrk
 ammin_db_du      0011 10000111 00011 ..... ..... .....    @fmt_rdrjrk
+
+#
+# Fixed point extra instruction
+#
+crc_w_b_w        0000 00000010 01000 ..... ..... .....    @fmt_rdrjrk
+crc_w_h_w        0000 00000010 01001 ..... ..... .....    @fmt_rdrjrk
+crc_w_w_w        0000 00000010 01010 ..... ..... .....    @fmt_rdrjrk
+crc_w_d_w        0000 00000010 01011 ..... ..... .....    @fmt_rdrjrk
+crcc_w_b_w       0000 00000010 01100 ..... ..... .....    @fmt_rdrjrk
+crcc_w_h_w       0000 00000010 01101 ..... ..... .....    @fmt_rdrjrk
+crcc_w_w_w       0000 00000010 01110 ..... ..... .....    @fmt_rdrjrk
+crcc_w_d_w       0000 00000010 01111 ..... ..... .....    @fmt_rdrjrk
+break            0000 00000010 10100 ...............      @fmt_code
+syscall          0000 00000010 10110 ...............      @fmt_code
+asrtle_d         0000 00000000 00010 ..... ..... 00000    @fmt_rjrk
+asrtgt_d         0000 00000000 00011 ..... ..... 00000    @fmt_rjrk
+rdtimel_w        0000 00000000 00000 11000 ..... .....    @fmt_rdrj
+rdtimeh_w        0000 00000000 00000 11001 ..... .....    @fmt_rdrj
+rdtime_d         0000 00000000 00000 11010 ..... .....    @fmt_rdrj
+cpucfg           0000 00000000 00000 11011 ..... .....    @fmt_rdrj
