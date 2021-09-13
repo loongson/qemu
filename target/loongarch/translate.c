@@ -16,6 +16,7 @@
 #include "exec/translator.h"
 #include "exec/log.h"
 #include "qemu/qemu-print.h"
+#include "fpu/softfloat.h"
 #include "translate.h"
 #include "internals.h"
 
@@ -26,6 +27,15 @@ TCGv_i32 cpu_fcsr0;
 TCGv_i64 cpu_fpr[32];
 
 #define DISAS_STOP       DISAS_TARGET_0
+
+/*
+ * LoongArch requires NaN-boxing of narrower width floating point values.
+ * This applies when a 32-bit value is assigned to a 64-bit FP register.
+ */
+static void gen_nanbox_s(TCGv_i64 out, TCGv_i64 in)
+{
+    tcg_gen_ori_i64(out, in, MAKE_64BIT_MASK(32, 32));
+}
 
 void generate_exception(DisasContext *ctx, int excp)
 {
@@ -176,6 +186,7 @@ static void gen_set_gpr(int reg_num, TCGv t, DisasExtend dst_ext)
 #include "insn_trans/trans_memory.c"
 #include "insn_trans/trans_atomic.c"
 #include "insn_trans/trans_extra.c"
+#include "insn_trans/trans_farith.c"
 
 static void loongarch_tr_translate_insn(DisasContextBase *dcbase, CPUState *cs)
 {
