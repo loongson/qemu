@@ -143,6 +143,7 @@ static void loongarch_cpu_reset(DeviceState *dev)
     env->fcsr0_mask = 0x1f1f031f;
     env->fcsr0 = 0x0;
 
+    restore_fp_status(env);
     cs->exception_index = EXCP_NONE;
 }
 
