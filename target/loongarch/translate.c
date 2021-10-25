@@ -191,6 +191,7 @@ static void gen_set_gpr(int reg_num, TCGv t, DisasExtend dst_ext)
 #include "insn_trans/trans_fcnv.c"
 #include "insn_trans/trans_fmov.c"
 #include "insn_trans/trans_fmemory.c"
+#include "insn_trans/trans_branch.c"
 
 static void loongarch_tr_translate_insn(DisasContextBase *dcbase, CPUState *cs)
 {
