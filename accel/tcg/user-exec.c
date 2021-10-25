@@ -803,6 +803,21 @@ int cpu_signal_handler(int host_signum, void *pinfo,
     return handle_cpu_signal(pc, info, is_write, &uc->uc_sigmask);
 }
 
+#elif defined(__loongarch__)
+
+int cpu_signal_handler(int host_signum, void *pinfo,
+                       void *puc)
+{
+    siginfo_t *info = pinfo;
+    ucontext_t *uc = puc;
+    greg_t pc = uc->uc_mcontext.__pc;
+    int is_write;
+
+    /* XXX: compute is_write */
+    is_write = 0;
+    return handle_cpu_signal(pc, info, is_write, &uc->uc_sigmask);
+}
+
 #elif defined(__riscv)
 
 int cpu_signal_handler(int host_signum, void *pinfo,
