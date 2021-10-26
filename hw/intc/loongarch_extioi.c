@@ -75,12 +75,14 @@ static void extioi_handler(void *opaque, int irq, int level)
 
 static uint32_t extioi_readb(void *opaque, hwaddr addr)
 {
-    loongarch_extioi *state = opaque;
+    loongarch_extioi **backref = (loongarch_extioi **)opaque;
+    loongarch_extioi *state = *backref;
     unsigned long offset, reg_count;
     uint8_t ret;
-    int cpu;
+    int cpu, node_id;
 
     offset = addr & 0xffff;
+    node_id = (backref - state->backref);
 
     if ((offset >= EXTIOI_ENABLE_START) && (offset < EXTIOI_ENABLE_END)) {
         reg_count = (offset - EXTIOI_ENABLE_START);
@@ -92,7 +94,7 @@ static uint32_t extioi_readb(void *opaque, hwaddr addr)
     } else if ((offset >= EXTIOI_COREISR_START) &&
                (offset < EXTIOI_COREISR_END)) {
         reg_count = ((offset - EXTIOI_COREISR_START) & 0x1f);
-        cpu = ((offset - EXTIOI_COREISR_START) >> 8) & 0x3;
+        cpu = node_id * 4 + (((offset - EXTIOI_COREISR_START) >> 8) & 0x3);
         ret = state->coreisr_reg8[cpu][reg_count];
     } else if ((offset >= EXTIOI_IPMAP_START) &&
                (offset < EXTIOI_IPMAP_END)) {
@@ -101,7 +103,7 @@ static uint32_t extioi_readb(void *opaque, hwaddr addr)
     } else if ((offset >= EXTIOI_COREMAP_START) &&
                (offset < EXTIOI_COREMAP_END)) {
         reg_count = (offset - EXTIOI_COREMAP_START);
-        ret = state->coremap_reg8[reg_count];
+        ret = state->coremap_reg8[node_id][reg_count];
     } else if ((offset >= EXTIOI_NODETYPE_START) &&
                (offset < EXTIOI_NODETYPE_END)) {
         reg_count = (offset - EXTIOI_NODETYPE_START);
@@ -114,12 +116,14 @@ static uint32_t extioi_readb(void *opaque, hwaddr addr)
 
 static uint32_t extioi_readw(void *opaque, hwaddr addr)
 {
-    loongarch_extioi *state = opaque;
+    loongarch_extioi **backref = (loongarch_extioi **)opaque;
+    loongarch_extioi *state = *backref;
     unsigned long offset, reg_count;
     uint32_t ret;
-    int cpu;
+    int cpu, node_id;
 
     offset = addr & 0xffff;
+    node_id = (backref - state->backref);
 
     if ((offset >= EXTIOI_ENABLE_START) && (offset < EXTIOI_ENABLE_END)) {
         reg_count = (offset - EXTIOI_ENABLE_START) / 4;
@@ -131,7 +135,7 @@ static uint32_t extioi_readw(void *opaque, hwaddr addr)
     } else if ((offset >= EXTIOI_COREISR_START) &&
                (offset < EXTIOI_COREISR_END)) {
         reg_count = ((offset - EXTIOI_COREISR_START) & 0x1f) / 4;
-        cpu = ((offset - EXTIOI_COREISR_START) >> 8) & 0x3;
+        cpu = node_id * 4 + (((offset - EXTIOI_COREISR_START) >> 8) & 0x3);
         ret = state->coreisr_reg32[cpu][reg_count];
     } else if ((offset >= EXTIOI_IPMAP_START) &&
                (offset < EXTIOI_IPMAP_END)) {
@@ -140,7 +144,7 @@ static uint32_t extioi_readw(void *opaque, hwaddr addr)
     } else if ((offset >= EXTIOI_COREMAP_START) &&
                (offset < EXTIOI_COREMAP_END)) {
         reg_count = (offset - EXTIOI_COREMAP_START) / 4;
-        ret = state->coremap_reg32[reg_count];
+        ret = state->coremap_reg32[node_id][reg_count];
     } else if ((offset >= EXTIOI_NODETYPE_START) &&
                (offset < EXTIOI_NODETYPE_END)) {
         reg_count = (offset - EXTIOI_NODETYPE_START) / 4;
@@ -153,12 +157,14 @@ static uint32_t extioi_readw(void *opaque, hwaddr addr)
 
 static uint64_t extioi_readl(void *opaque, hwaddr addr)
 {
-    loongarch_extioi *state = opaque;
+    loongarch_extioi **backref = (loongarch_extioi **)opaque;
+    loongarch_extioi *state = *backref;
     unsigned long offset, reg_count;
     uint64_t ret;
-    int cpu;
+    int cpu, node_id;
 
     offset = addr & 0xffff;
+    node_id = (backref - state->backref);
 
     if ((offset >= EXTIOI_ENABLE_START) && (offset < EXTIOI_ENABLE_END)) {
         reg_count = (offset - EXTIOI_ENABLE_START) / 8;
@@ -170,7 +176,7 @@ static uint64_t extioi_readl(void *opaque, hwaddr addr)
     } else if ((offset >= EXTIOI_COREISR_START) &&
                (offset < EXTIOI_COREISR_END)) {
         reg_count = ((offset - EXTIOI_COREISR_START) & 0x1f) / 8;
-        cpu = ((offset - EXTIOI_COREISR_START) >> 8) & 0x3;
+        cpu = node_id * 4 + (((offset - EXTIOI_COREISR_START) >> 8) & 0x3);
         ret = state->coreisr_reg64[cpu][reg_count];
     } else if ((offset >= EXTIOI_IPMAP_START) &&
                (offset < EXTIOI_IPMAP_END)) {
@@ -178,7 +184,7 @@ static uint64_t extioi_readl(void *opaque, hwaddr addr)
     } else if ((offset >= EXTIOI_COREMAP_START) &&
                (offset < EXTIOI_COREMAP_END)) {
         reg_count = (offset - EXTIOI_COREMAP_START) / 8;
-        ret = state->coremap_reg64[reg_count];
+        ret = state->coremap_reg64[node_id][reg_count];
     } else if ((offset >= EXTIOI_NODETYPE_START) &&
                (offset < EXTIOI_NODETYPE_END)) {
         reg_count = (offset - EXTIOI_NODETYPE_START) / 8;
@@ -191,13 +197,15 @@ static uint64_t extioi_readl(void *opaque, hwaddr addr)
 
 static void extioi_writeb(void *opaque, hwaddr addr, uint32_t val)
 {
-    loongarch_extioi *state = opaque;
+    loongarch_extioi **backref = (loongarch_extioi **)opaque;
+    loongarch_extioi *state = *backref;
     unsigned long offset, reg_count;
     uint8_t old_data_u8;
-    int cpu, i, ipnum, level, mask, irqnum;
+    int cpu, node_id, i, ipnum, level, mask, irqnum;
 
     offset = addr & 0xffff;
     val = val & 0xffUL;
+    node_id = (backref - state->backref);
 
     if ((offset >= EXTIOI_ENABLE_START) && (offset < EXTIOI_ENABLE_END)) {
         reg_count = (offset - EXTIOI_ENABLE_START);
@@ -235,7 +243,7 @@ static void extioi_writeb(void *opaque, hwaddr addr, uint32_t val)
     } else if ((offset >= EXTIOI_COREISR_START) &&
                (offset < EXTIOI_COREISR_END)) {
         reg_count = (offset - EXTIOI_COREISR_START) & 0x1f;
-        cpu = ((offset - EXTIOI_COREISR_START) >> 8) & 0x3;
+        cpu = node_id * 4 + (((offset - EXTIOI_COREISR_START) >> 8) & 0x3);
 
         /* ext_isr */
         old_data_u8 = state->isr_reg8[reg_count];
@@ -285,8 +293,8 @@ static void extioi_writeb(void *opaque, hwaddr addr, uint32_t val)
         /* node map different from kernel */
         if (cpu) {
             cpu = ctz32(cpu);
-            state->coremap_reg8[reg_count] = val;
-            state->sw_coremap[reg_count] = cpu;
+            state->coremap_reg8[node_id][reg_count] = val;
+            state->sw_coremap[reg_count] = node_id * 4 + cpu;
         }
     } else if ((offset >= EXTIOI_NODETYPE_START) &&
                (offset < EXTIOI_NODETYPE_END)) {
@@ -299,11 +307,13 @@ static void extioi_writeb(void *opaque, hwaddr addr, uint32_t val)
 
 static void extioi_writew(void *opaque, hwaddr addr, uint32_t val)
 {
-    loongarch_extioi *state = opaque;
-    int cpu, level;
+    loongarch_extioi **backref = (loongarch_extioi **)opaque;
+    loongarch_extioi *state = *backref;
+    int cpu, node_id, level;
     uint32_t offset, old_data_u32, reg_count, mask, i;
 
     offset = addr & 0xffff;
+    node_id = (backref - state->backref);
 
     if ((offset >= EXTIOI_ENABLE_START) && (offset < EXTIOI_ENABLE_END)) {
         reg_count = (offset - EXTIOI_ENABLE_START) / 4;
@@ -328,7 +338,7 @@ static void extioi_writew(void *opaque, hwaddr addr, uint32_t val)
     } else if ((offset >= EXTIOI_COREISR_START) &&
                (offset < EXTIOI_COREISR_END)) {
         reg_count = ((offset - EXTIOI_COREISR_START) & 0x1f) / 4;
-        cpu = ((offset - EXTIOI_COREISR_START) >> 8) & 0x3;
+        cpu = node_id * 4 + (((offset - EXTIOI_COREISR_START) >> 8) & 0x3);
 
         /* ext_isr */
         old_data_u32 = state->isr_reg32[reg_count];
@@ -370,11 +380,13 @@ static void extioi_writew(void *opaque, hwaddr addr, uint32_t val)
 
 static void extioi_writel(void *opaque, hwaddr addr, uint64_t val)
 {
-    loongarch_extioi *state = (loongarch_extioi *)opaque;
-    int cpu, level;
+    loongarch_extioi **backref = (loongarch_extioi **)opaque;
+    loongarch_extioi *state = *backref;
+    int cpu, node_id, level;
     uint64_t offset, old_data_u64, reg_count, mask, i;
 
     offset = addr & 0xffff;
+    node_id = (backref - state->backref);
 
     if ((offset >= EXTIOI_ENABLE_START) && (offset < EXTIOI_ENABLE_END)) {
         reg_count = (offset - EXTIOI_ENABLE_START) / 8;
@@ -398,7 +410,7 @@ static void extioi_writel(void *opaque, hwaddr addr, uint64_t val)
     } else if ((offset >= EXTIOI_COREISR_START) &&
                (offset < EXTIOI_COREISR_END)) {
         reg_count = ((offset - EXTIOI_COREISR_START) & 0x1f) / 8;
-        cpu = ((offset - EXTIOI_COREISR_START) >> 8) & 0x3;
+        cpu = node_id * 4 + (((offset - EXTIOI_COREISR_START) >> 8) & 0x3);
 
         /* core_ext_ioisr */
         old_data_u64 = state->coreisr_reg64[cpu][reg_count];
@@ -489,7 +501,9 @@ static void loongarch_extioi_realize(DeviceState *dev, Error **errp)
     LoongarchMachineState *lsms = LOONGARCH_MACHINE(qdev_get_machine());
     MachineState *ms = MACHINE(lsms);
     loongarch_extioi *p = LOONGARCH_EXTIOI(dev);
-    int cpu, pin;
+    int cpu, pin, id, nb_nodes;
+    char str[16];
+    nb_nodes = (ms->smp.cpus - 1) >> 2;
 
     qdev_init_gpio_in(dev, extioi_setirq, EXTIOI_IRQS);
 
@@ -497,9 +511,13 @@ static void loongarch_extioi_realize(DeviceState *dev, Error **errp)
         sysbus_init_irq(SYS_BUS_DEVICE(dev), &p->irq[i]);
     }
 
-    memory_region_init_io(&p->mmio, OBJECT(p), &extioi_ops, p,
-                          TYPE_LOONGARCH_EXTIOI, 0x900);
-    sysbus_init_mmio(SYS_BUS_DEVICE(dev), &p->mmio);
+    for (id = 0; id <= nb_nodes; id++) {
+        p->backref[id] = p;
+        sprintf(str, "extioi%d", id);
+        memory_region_init_io(&p->mmio[id], OBJECT(p), &extioi_ops,
+                              &p->backref[id], str, 0x900);
+        sysbus_init_mmio(SYS_BUS_DEVICE(dev), &p->mmio[id]);
+    }
 
     for (cpu = 0; cpu < ms->smp.cpus; cpu++) {
         for (pin = 0; pin < LS3A_INTC_IP; pin++) {
@@ -535,8 +553,8 @@ static const VMStateDescription vmstate_loongarch_extioi = {
                               EXTIOI_IRQS_BITMAP_SIZE),
         VMSTATE_UINT8_ARRAY(ipmap_reg8, loongarch_extioi,
                             EXTIOI_IRQS_IPMAP_SIZE),
-        VMSTATE_UINT8_ARRAY(coremap_reg8, loongarch_extioi,
-                            EXTIOI_IRQS_COREMAP_SIZE),
+        VMSTATE_UINT8_2DARRAY(coremap_reg8, loongarch_extioi,
+                              LS3A_NODES, EXTIOI_IRQS_COREMAP_SIZE),
         VMSTATE_UINT16_ARRAY(nodetype_reg16, loongarch_extioi,
                              EXTIOI_IRQS_NODETYPE_SIZE),
         VMSTATE_UINT8_ARRAY(sw_ipmap, loongarch_extioi, EXTIOI_IRQS),
