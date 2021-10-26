@@ -28,6 +28,38 @@ static const VMStateDescription vmstate_ls7a_pcie = {
     }
 };
 
+static PCIINTxRoute ls7a_route_intx_pin_to_irq(void *opaque, int pin)
+{
+    PCIINTxRoute route;
+
+    route.irq = pin;
+    route.mode = PCI_INTX_ENABLED;
+    return route;
+}
+
+static int pci_ls7a_map_irq(PCIDevice *d, int irq_num)
+{
+    PCIBus *bus;
+    int irq;
+
+    bus = pci_get_bus(d);
+    if (bus->parent_dev) {
+        irq = pci_swizzle_map_irq_fn(d, irq_num);
+        return irq;
+     }
+
+     irq = 64 + 16 + ((PCI_SLOT(d->devfn) * 4 + irq_num) & 0xf);
+
+    return irq;
+}
+
+static void pci_ls7a_set_irq(void *opaque, int irq_num, int level)
+{
+    LS7APCIEHost *pciehost = opaque;
+
+    qemu_set_irq(pciehost->pic[irq_num - 64], level);
+}
+
 static void pci_ls7a_config_write(void *opaque, hwaddr addr,
                                   uint64_t val, unsigned size)
 {
@@ -64,10 +96,12 @@ static void ls7a_pciehost_realize(DeviceState *dev, Error **errp)
     PCIExpressHost *e = PCIE_HOST_BRIDGE(dev);
     PCIHostState *phb = PCI_HOST_BRIDGE(e);
 
-    phb->bus = pci_register_root_bus(dev, "pcie.0", NULL,
-                                     NULL, pciehost,
+    phb->bus = pci_register_root_bus(dev, "pcie.0", pci_ls7a_set_irq,
+                                     pci_ls7a_map_irq, pciehost,
                                      get_system_memory(), get_system_io(),
                                      PCI_DEVFN(1, 0), 128, TYPE_PCIE_BUS);
+
+    pci_bus_set_route_irq_fn(phb->bus, ls7a_route_intx_pin_to_irq);
 
     memory_region_init_io(&pciehost->pci_conf, OBJECT(dev),
                           &pci_ls7a_config_ops, phb->bus,
