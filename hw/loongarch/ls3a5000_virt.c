@@ -14,6 +14,8 @@
 #include "hw/char/serial.h"
 #include "sysemu/sysemu.h"
 #include "sysemu/qtest.h"
+#include "hw/loader.h"
+#include "elf.h"
 #include "hw/irq.h"
 #include "net/net.h"
 #include "sysemu/runstate.h"
@@ -24,6 +26,9 @@
 #include "hw/intc/loongarch_pch_msi.h"
 #include "hw/pci-host/ls7a.h"
 #include "hw/misc/unimp.h"
+#include "hw/loongarch/fw_cfg.h"
+
+#define LOONGSON3_BIOSNAME "loongarch_bios.bin"
 
 CPULoongArchState *cpu_states[LOONGARCH_MAX_VCPUS];
 
@@ -181,8 +186,9 @@ static void ls3a5000_virt_init(MachineState *machine)
     const char *cpu_model = machine->cpu_type;
     LoongArchCPU *cpu;
     CPULoongArchState *env;
-    uint64_t lowram_size = 0, highram_size = 0;
+    uint64_t highram_size = 0;
     MemoryRegion *lowmem = g_new(MemoryRegion, 1);
+    MemoryRegion *highmem = g_new(MemoryRegion, 1);
     char *ramName = NULL;
     ram_addr_t ram_size = machine->ram_size;
     MemoryRegion *address_space_mem = get_system_memory();
@@ -190,6 +196,10 @@ static void ls3a5000_virt_init(MachineState *machine)
     int i;
     MemoryRegion *iomem = NULL;
     PCIBus *pci_bus = NULL;
+    int bios_size;
+    char *filename;
+    MemoryRegion *bios = g_new(MemoryRegion, 1);
+    ram_addr_t offset = 0;
 
     if (!cpu_model) {
         cpu_model = LOONGARCH_CPU_TYPE_NAME("Loongson-3A5000");
@@ -227,20 +237,45 @@ static void ls3a5000_virt_init(MachineState *machine)
         qemu_register_reset(main_cpu_reset, cpu);
     }
 
-    ramName = g_strdup_printf("loongarch.lowram");
-    lowram_size = MIN(ram_size, 256 * 0x100000);
-    memory_region_init_alias(lowmem, NULL, ramName, machine->ram,
-                             0, lowram_size);
-    memory_region_add_subregion(address_space_mem, 0, lowmem);
-
-    highram_size = ram_size > lowram_size ? ram_size - 256 * 0x100000 : 0;
-    if (highram_size > 0) {
-        MemoryRegion *highmem = g_new(MemoryRegion, 1);
-        ramName = g_strdup_printf("loongarch.highram");
-        memory_region_init_alias(highmem, NULL, ramName, machine->ram,
-                                 lowram_size, highram_size);
-        memory_region_add_subregion(address_space_mem, 0x90000000, highmem);
+    if (ram_size < 1 * GiB) {
+        error_report("ram_size must be greater than 1G due to the bios memory layout");
+        exit(1);
     }
+
+    ramName = g_strdup_printf("loongarch.lowram");
+    memory_region_init_alias(lowmem, NULL, ramName, machine->ram,
+                             0, 256 * MiB);
+    memory_region_add_subregion(address_space_mem, offset, lowmem);
+    offset += 256 * MiB;
+
+    highram_size = ram_size - 256 * MiB;
+    ramName = g_strdup_printf("loongarch.highram");
+    memory_region_init_alias(highmem, NULL, ramName, machine->ram,
+                             offset, highram_size);
+    memory_region_add_subregion(address_space_mem, 0x90000000, highmem);
+    offset += highram_size;
+
+    /* load the BIOS image. */
+    filename = qemu_find_file(QEMU_FILE_TYPE_BIOS,
+                              machine->firmware ?: LOONGSON3_BIOSNAME);
+    if (filename) {
+        bios_size = load_image_targphys(filename, LA_BIOS_BASE, LA_BIOS_SIZE);
+        lsms->fw_cfg = loongarch_fw_cfg_init(ram_size, machine);
+        rom_set_fw(lsms->fw_cfg);
+        g_free(filename);
+    } else {
+        bios_size = -1;
+    }
+
+    if ((bios_size < 0 || bios_size > LA_BIOS_SIZE) && !qtest_enabled()) {
+        error_report("Could not load LOONGARCH bios '%s'", machine->firmware);
+        exit(1);
+    }
+
+    memory_region_init_ram(bios, NULL, "loongarch.bios",
+                           LA_BIOS_SIZE, &error_fatal);
+    memory_region_set_readonly(bios, true);
+    memory_region_add_subregion(get_system_memory(), LA_BIOS_BASE, bios);
 
     /*Add PM mmio memory for reboot and shutdown*/
     iomem = g_new(MemoryRegion, 1);
@@ -293,6 +328,7 @@ static void loongarch_class_init(ObjectClass *oc, void *data)
     mc->default_ram_id = "loongarch.ram";
     mc->max_cpus = LOONGARCH_MAX_VCPUS;
     mc->is_default = 1;
+    mc->default_machine_opts = "firmware=loongarch_bios.bin";
     mc->default_kernel_irqchip_split = false;
     mc->block_default_type = IF_VIRTIO;
     mc->default_boot_order = "c";
