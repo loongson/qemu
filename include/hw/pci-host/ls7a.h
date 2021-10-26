@@ -24,6 +24,10 @@
 
 #define LS7A_PCI_IO_BASE        0x18000000UL
 #define LS7A_PCI_IO_SIZE        0x00010000
+#define LS7A_PCH_REG_BASE       0x10000000UL
+#define LS7A_IOAPIC_REG_BASE    (LS7A_PCH_REG_BASE)
+#define LS7A_PCH_MSI_ADDR_LOW   0x2FF00000UL
+
 typedef struct LS7APCIState LS7APCIState;
 typedef struct LS7APCIEHost {
     PCIExpressHost parent_obj;
