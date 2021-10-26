@@ -118,7 +118,7 @@ static void ls7a_pciehost_realize(DeviceState *dev, Error **errp)
     pcie_host_mmcfg_update(e, true, LS_PCIECFG_BASE, LS_PCIECFG_SIZE);
 }
 
-PCIBus *ls7a_init(MachineState *machine, qemu_irq *pic)
+PCIBus *ls7a_init(MachineState *machine, DeviceState *pch_pic, qemu_irq *pic)
 {
     DeviceState *dev;
     PCIHostState *phb;
@@ -141,6 +141,8 @@ PCIBus *ls7a_init(MachineState *machine, qemu_irq *pic)
     pbs->pciehost->pci_dev = pbs;
 
     pci_realize_and_unref(pci_dev, phb->bus, &error_fatal);
+
+    ls7a_pm_init(pci_dev, &pbs->pm, pch_pic);
 
     return phb->bus;
 }

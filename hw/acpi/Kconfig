@@ -11,6 +11,10 @@ config ACPI_X86
     select ACPI_PIIX4
     select ACPI_PCIHP
 
+config ACPI_LOONGARCH
+    bool
+    select ACPI
+
 config ACPI_X86_ICH
     bool
     select ACPI_X86
