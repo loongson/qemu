@@ -38,6 +38,8 @@ int loongarch_map_address(CPULoongArchState *env, hwaddr *physical, int *prot,
 
 void loongarch_mmu_init(CPULoongArchState *env);
 hwaddr loongarch_cpu_get_phys_page_debug(CPUState *cpu, vaddr addr);
+void loongarch_invalidate_tlb(CPULoongArchState *env, int idx);
+void cpu_loongarch_tlb_flush(CPULoongArchState *env);
 #endif
 
 #endif

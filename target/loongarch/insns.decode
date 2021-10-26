@@ -42,6 +42,9 @@
 %offs16  10:s16
 %offs    0:s10 10:16
 %csr     10:14
+%addr    10:5
+%info    5:5
+%invop   0:5
 
 #
 # Argument sets
@@ -84,6 +87,8 @@
 &fmt_offs           offs
 &fmt_rjrdoffs16     rj rd offs16
 &fmt_rdrjcsr        rd rj csr
+&fmt_empty
+&fmt_invtlb         invop rj rk
 
 #
 # Formats
@@ -126,6 +131,8 @@
 @fmt_offs            .... .. ..........................       &fmt_offs           %offs
 @fmt_rjrdoffs16      .... .. ................ ..... .....     &fmt_rjrdoffs16     %rj %rd %offs16
 @fmt_rdrjcsr         .... .... .............. ..... .....     &fmt_rdrjcsr        %rd %rj %csr
+@fmt_empty           .... ........ ..... ..... ..... .....    &fmt_empty
+@fmt_invtlb          ...... ...... ..... ..... ..... .....    &fmt_invtlb         %invop %rj %rk
 
 #
 # Fixed point arithmetic operation instruction
@@ -494,3 +501,10 @@ iocsrwr_b        0000 01100100 10000 00100 ..... .....    @fmt_rdrj
 iocsrwr_h        0000 01100100 10000 00101 ..... .....    @fmt_rdrj
 iocsrwr_w        0000 01100100 10000 00110 ..... .....    @fmt_rdrj
 iocsrwr_d        0000 01100100 10000 00111 ..... .....    @fmt_rdrj
+tlbsrch          0000 01100100 10000 01010 00000 00000    @fmt_empty
+tlbrd            0000 01100100 10000 01011 00000 00000    @fmt_empty
+tlbwr            0000 01100100 10000 01100 00000 00000    @fmt_empty
+tlbfill          0000 01100100 10000 01101 00000 00000    @fmt_empty
+tlbclr           0000 01100100 10000 01000 00000 00000    @fmt_empty
+tlbflush         0000 01100100 10000 01001 00000 00000    @fmt_empty
+invtlb           0000 01100100 10011 ..... ..... .....    @fmt_invtlb
