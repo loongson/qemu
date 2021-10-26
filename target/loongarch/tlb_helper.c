@@ -771,3 +771,85 @@ bool loongarch_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
         do_raise_exception(env, cs->exception_index, retaddr);
     }
 }
+
+target_ulong helper_lddir(CPULoongArchState *env, target_ulong base,
+                          target_ulong level, uint32_t mem_idx)
+{
+    target_ulong badvaddr;
+    target_ulong index;
+    target_ulong vaddr;
+    int shift;
+    uint64_t dir1_base, dir1_width;
+    uint64_t dir3_base, dir3_width;
+
+    badvaddr = env->CSR_TLBRBADV;
+
+    /* 0:8B, 1:16B, 2:32B, 3:64B */
+    shift = FIELD_EX64(env->CSR_PWCL, CSR_PWCL, PTEWIDTH);
+    shift = (shift + 1) * 3;
+
+    switch (level) {
+    case 1:
+        dir1_base = FIELD_EX64(env->CSR_PWCL, CSR_PWCL, DIR1_BASE);
+        dir1_width = FIELD_EX64(env->CSR_PWCL, CSR_PWCL, DIR1_WIDTH);
+        index = (badvaddr >> dir1_base) & ((1 << dir1_width) - 1);
+        break;
+    case 3:
+        dir3_base = FIELD_EX64(env->CSR_PWCH, CSR_PWCH, DIR3_BASE);
+        dir3_width = FIELD_EX64(env->CSR_PWCH, CSR_PWCH, DIR3_WIDTH);
+        index = (badvaddr >> dir3_base) & ((1 << dir3_width) - 1);
+        break;
+    default:
+        do_raise_exception(env, EXCP_INE, GETPC());
+        return 0;
+    }
+
+    vaddr = base | index << shift;
+    return cpu_ldq_mmuidx_ra(env, vaddr, mem_idx, GETPC());
+}
+
+void helper_ldpte(CPULoongArchState *env, target_ulong base, target_ulong odd,
+                  uint32_t mem_idx)
+{
+    target_ulong vaddr;
+    target_ulong tmp0;
+    target_ulong ptindex, ptoffset0, ptoffset1;
+    target_ulong pagesize;
+    target_ulong badv;
+    int shift;
+    bool huge = base & LOONGARCH_PAGE_HUGE;
+    uint64_t ptbase = FIELD_EX64(env->CSR_PWCL, CSR_PWCL, PTBASE);
+    uint64_t ptwidth = FIELD_EX64(env->CSR_PWCL, CSR_PWCL, PTWIDTH);
+
+    if (huge) {
+        /* Huge Page. base is paddr */
+        tmp0 = base ^ LOONGARCH_PAGE_HUGE;
+        /* move Global bit */
+        tmp0 |= ((tmp0 & LOONGARCH_HUGE_GLOBAL)
+                 >> (LOONGARCH_HUGE_GLOBAL_SH - R_CSR_TLBELO0_G_SHIFT));
+        pagesize = ptbase + ptwidth - 1;
+        if (odd) {
+            tmp0 += (1 << pagesize);
+        }
+    } else {
+        /* 0:8B, 1:16B, 2:32B, 3:64B */
+        shift = FIELD_EX64(env->CSR_PWCL, CSR_PWCL, PTEWIDTH);
+        shift = (shift + 1) * 3;
+        badv = env->CSR_TLBRBADV;
+
+        ptindex = (badv >> ptbase) & ((1 << ptwidth) - 1);
+        ptindex = ptindex & ~0x1;   /* clear bit 0 */
+        ptoffset0 = ptindex << shift;
+        ptoffset1 = (ptindex + 1) << shift;
+
+        vaddr = base | (odd ? ptoffset1 : ptoffset0);
+        tmp0 = cpu_ldq_mmuidx_ra(env, vaddr, mem_idx, GETPC());
+        pagesize = ptbase;
+    }
+    if (odd) {
+        env->CSR_TLBRELO1 = tmp0;
+    } else {
+        env->CSR_TLBRELO0 = tmp0;
+    }
+    env->CSR_TLBREHI = FIELD_DP64(env->CSR_TLBREHI, CSR_TLBREHI, PS, pagesize);
+}

@@ -42,9 +42,12 @@
 %offs16  10:s16
 %offs    0:s10 10:16
 %csr     10:14
+%cop     0:5
 %addr    10:5
 %info    5:5
 %invop   0:5
+%level   10:8
+%seq     10:8
 
 #
 # Argument sets
@@ -87,8 +90,11 @@
 &fmt_offs           offs
 &fmt_rjrdoffs16     rj rd offs16
 &fmt_rdrjcsr        rd rj csr
+&fmt_coprjsi12      cop rj si12
 &fmt_empty
 &fmt_invtlb         invop rj rk
+&fmt_rdrjlevel      rd rj level
+&fmt_rjseq          rj seq
 
 #
 # Formats
@@ -131,8 +137,11 @@
 @fmt_offs            .... .. ..........................       &fmt_offs           %offs
 @fmt_rjrdoffs16      .... .. ................ ..... .....     &fmt_rjrdoffs16     %rj %rd %offs16
 @fmt_rdrjcsr         .... .... .............. ..... .....     &fmt_rdrjcsr        %rd %rj %csr
+@fmt_coprjsi12       .... ...... ............ ..... .....     &fmt_coprjsi12      %cop %rj %si12
 @fmt_empty           .... ........ ..... ..... ..... .....    &fmt_empty
 @fmt_invtlb          ...... ...... ..... ..... ..... .....    &fmt_invtlb         %invop %rj %rk
+@fmt_rdrjlevel       .... ........ .. ........ ..... .....    &fmt_rdrjlevel      %rd %rj %level
+@fmt_rjseq           .... ........ .. ........ ..... .....    &fmt_rjseq          %rj %seq
 
 #
 # Fixed point arithmetic operation instruction
@@ -501,6 +510,7 @@ iocsrwr_b        0000 01100100 10000 00100 ..... .....    @fmt_rdrj
 iocsrwr_h        0000 01100100 10000 00101 ..... .....    @fmt_rdrj
 iocsrwr_w        0000 01100100 10000 00110 ..... .....    @fmt_rdrj
 iocsrwr_d        0000 01100100 10000 00111 ..... .....    @fmt_rdrj
+cacop            0000 011000 ............ ..... .....     @fmt_coprjsi12
 tlbsrch          0000 01100100 10000 01010 00000 00000    @fmt_empty
 tlbrd            0000 01100100 10000 01011 00000 00000    @fmt_empty
 tlbwr            0000 01100100 10000 01100 00000 00000    @fmt_empty
@@ -508,3 +518,8 @@ tlbfill          0000 01100100 10000 01101 00000 00000    @fmt_empty
 tlbclr           0000 01100100 10000 01000 00000 00000    @fmt_empty
 tlbflush         0000 01100100 10000 01001 00000 00000    @fmt_empty
 invtlb           0000 01100100 10011 ..... ..... .....    @fmt_invtlb
+lddir            0000 01100100 00 ........ ..... .....    @fmt_rdrjlevel
+ldpte            0000 01100100 01 ........ ..... 00000    @fmt_rjseq
+ertn             0000 01100100 10000 01110 00000 00000    @fmt_empty
+idle             0000 01100100 10001 ...............      @fmt_whint
+dbcl             0000 00000010 10101 ...............      @fmt_code
