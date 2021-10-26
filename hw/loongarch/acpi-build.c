@@ -108,7 +108,8 @@ build_facs(GArray *table_data)
 static void
 build_madt(GArray *table_data, BIOSLinker *linker, LoongarchMachineState *lsms)
 {
-    MachineState *ms = MACHINE(lsms);
+    MachineClass *mc = MACHINE_GET_CLASS(lsms);
+    const CPUArchIdList *core_ids = mc->possible_cpu_arch_ids(MACHINE(lsms));
     int i;
     AcpiTable table = { .sig = "APIC", .rev = 1, .oem_id = lsms->oem_id,
                         .oem_table_id = lsms->oem_table_id };
@@ -119,13 +120,14 @@ build_madt(GArray *table_data, BIOSLinker *linker, LoongarchMachineState *lsms)
     build_append_int_noprefix(table_data, 0, 4);
     build_append_int_noprefix(table_data, 1 /* PCAT_COMPAT */, 4); /* Flags */
 
-    for (i = 0; i < ms->smp.cpus; i++) {
+    for (i = 0; i < core_ids->len; i++) {
+        uint32_t core_id = core_ids->cpus[i].arch_id;
         /* Rev 1.0b, Table 5-13 Processor Core Interrupt Controller Structure */
         build_append_int_noprefix(table_data, 17, 1);       /* Type */
         build_append_int_noprefix(table_data, 15, 1);       /* Length */
         build_append_int_noprefix(table_data, 1, 1);       /* Version */
         build_append_int_noprefix(table_data, i + 1, 4);     /* ACPI Processor ID */
-        build_append_int_noprefix(table_data, i, 4); /* Core ID */
+        build_append_int_noprefix(table_data, core_id, 4); /* Core ID */
         build_append_int_noprefix(table_data, 1, 4); /* Flags */
     }
 
@@ -165,8 +167,9 @@ static void
 build_srat(GArray *table_data, BIOSLinker *linker, MachineState *machine)
 {
     uint64_t i, mem_len, mem_base;
+    MachineClass *mc = MACHINE_GET_CLASS(machine);
     LoongarchMachineState *lsms = LOONGARCH_MACHINE(machine);
-    MachineState *ms = MACHINE(lsms);
+    const CPUArchIdList *core_ids = mc->possible_cpu_arch_ids(machine);
     AcpiTable table = { .sig = "SRAT", .rev = 1, .oem_id = lsms->oem_id,
                         .oem_table_id = lsms->oem_table_id };
 
@@ -174,13 +177,14 @@ build_srat(GArray *table_data, BIOSLinker *linker, MachineState *machine)
     build_append_int_noprefix(table_data, 1, 4); /* Reserved */
     build_append_int_noprefix(table_data, 0, 8); /* Reserved */
 
-    for (i = 0; i < ms->smp.cpus; ++i) {
+    for (i = 0; i < core_ids->len; ++i) {
+        uint32_t core_id = cpu_to_le32(core_ids->cpus[i].arch_id);
         /* 5.2.15.1 Processor Local APIC/SAPIC Affinity Structure */
         build_append_int_noprefix(table_data, 0, 1);  /* Type  */
         build_append_int_noprefix(table_data, 16, 1); /* Length */
         /* Proximity Domain [7:0] */
         build_append_int_noprefix(table_data, 0, 1);
-        build_append_int_noprefix(table_data, i, 1); /* APIC ID */
+        build_append_int_noprefix(table_data, core_id, 1); /* APIC ID */
         /* Flags, Table 5-36 */
         build_append_int_noprefix(table_data, 1, 4);
         build_append_int_noprefix(table_data, 0, 1); /* Local SAPIC EID */

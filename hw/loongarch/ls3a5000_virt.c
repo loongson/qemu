@@ -316,6 +316,8 @@ static void ls3a5000_virt_init(MachineState *machine)
     MemoryRegion *bios = g_new(MemoryRegion, 1);
     ram_addr_t offset = 0;
     DeviceState *pch_pic;
+    const CPUArchIdList *possible_cpus;
+    MachineClass *mc = MACHINE_GET_CLASS(machine);
 
     if (!cpu_model) {
         cpu_model = LOONGARCH_CPU_TYPE_NAME("Loongson-3A5000");
@@ -326,14 +328,19 @@ static void ls3a5000_virt_init(MachineState *machine)
     }
 
     /* init CPUs */
+    possible_cpus = mc->possible_cpu_arch_ids(machine);
     for (i = 0; i < machine->smp.cpus; i++) {
         Object *cpuobj = NULL;
         CPUState *cs;
 
-        cpuobj = object_new(machine->cpu_type);
+        cpuobj = object_new(possible_cpus->cpus[i].type);
+        object_property_set_uint(cpuobj, "id",
+                                 possible_cpus->cpus[i].arch_id, NULL);
 
         cs = CPU(cpuobj);
         cs->cpu_index = i;
+
+        machine->possible_cpus->cpus[i].cpu = cpuobj;
 
         qdev_realize(DEVICE(cpuobj), NULL, &error_fatal);
         object_unref(cpuobj);
@@ -478,12 +485,38 @@ static void loongarch_machine_initfn(Object *obj)
     lsms->oem_table_id = g_strndup(ACPI_BUILD_APPNAME8, 8);
 }
 
+static const CPUArchIdList *loongarch_possible_cpu_arch_ids(MachineState *ms)
+{
+    int i;
+    unsigned int max_cpus = ms->smp.max_cpus;
+
+    if (ms->possible_cpus) {
+        /*
+         * make sure that max_cpus hasn't changed since the first use, i.e.
+         * -smp hasn't been parsed after it
+         */
+        assert(ms->possible_cpus->len == max_cpus);
+        return ms->possible_cpus;
+    }
+
+    ms->possible_cpus = g_malloc0(sizeof(CPUArchIdList) +
+                                  sizeof(CPUArchId) * max_cpus);
+    ms->possible_cpus->len = max_cpus;
+    for (i = 0; i < ms->possible_cpus->len; i++) {
+            ms->possible_cpus->cpus[i].type = ms->cpu_type;
+            ms->possible_cpus->cpus[i].vcpus_count = 1;
+            ms->possible_cpus->cpus[i].arch_id = i;
+    }
+    return ms->possible_cpus;
+}
+
 static void loongarch_class_init(ObjectClass *oc, void *data)
 {
     MachineClass *mc = MACHINE_CLASS(oc);
 
     mc->desc = "Loongson-5000 LS7A1000 machine";
     mc->init = ls3a5000_virt_init;
+    mc->possible_cpu_arch_ids = loongarch_possible_cpu_arch_ids;
     mc->default_ram_size = 1 * GiB;
     mc->default_cpu_type = LOONGARCH_CPU_TYPE_NAME("Loongson-3A5000");
     mc->default_ram_id = "loongarch.ram";
