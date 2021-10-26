@@ -14,6 +14,7 @@
 
 #define LS3A_INTC_IP               8
 #define MAX_CORES                  LOONGARCH_MAX_VCPUS
+#define LS3A_NODES                 4
 #define EXTIOI_IRQS                (256)
 #define EXTIOI_IRQS_BITMAP_SIZE    (256 / 8)
 /* map to ipnum per 32 irqs */
@@ -76,9 +77,9 @@ typedef struct loongarch_extioi {
         uint8_t ipmap_reg8[EXTIOI_IRQS_IPMAP_SIZE];
     };
     union {
-        uint64_t coremap_reg64[EXTIOI_IRQS_COREMAP_SIZE / 8];
-        uint32_t coremap_reg32[EXTIOI_IRQS_COREMAP_SIZE / 4];
-        uint8_t coremap_reg8[EXTIOI_IRQS_COREMAP_SIZE];
+        uint64_t coremap_reg64[LS3A_NODES][EXTIOI_IRQS_COREMAP_SIZE / 8];
+        uint32_t coremap_reg32[LS3A_NODES][EXTIOI_IRQS_COREMAP_SIZE / 4];
+        uint8_t coremap_reg8[LS3A_NODES][EXTIOI_IRQS_COREMAP_SIZE];
     };
     union {
         uint64_t nodetype_reg64[EXTIOI_IRQS_NODETYPE_SIZE / 4];
@@ -94,7 +95,8 @@ typedef struct loongarch_extioi {
 
     qemu_irq parent_irq[MAX_CORES][LS3A_INTC_IP];
     qemu_irq irq[EXTIOI_IRQS];
-    MemoryRegion mmio;
+    MemoryRegion mmio[LS3A_NODES];
+    struct loongarch_extioi *backref[LS3A_NODES];
 } loongarch_extioi;
 
 #endif /* LOONGARCH_EXTIOI_H */

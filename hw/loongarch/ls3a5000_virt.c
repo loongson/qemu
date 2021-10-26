@@ -42,6 +42,38 @@ static struct _loaderparams {
 
 CPULoongArchState *cpu_states[LOONGARCH_MAX_VCPUS];
 
+struct la_memmap_entry {
+    uint64_t address;
+    uint64_t length;
+    uint32_t type;
+    uint32_t reserved;
+} ;
+
+static struct la_memmap_entry *la_memmap_table;
+static unsigned la_memmap_entries;
+
+static int la_memmap_add_entry(uint64_t address, uint64_t length, uint32_t type)
+{
+    int i;
+
+    for (i = 0; i < la_memmap_entries; i++) {
+        if (la_memmap_table[i].address == address) {
+            fprintf(stderr, "%s address:0x%lx length:0x%lx already exists\n",
+                     __func__, address, length);
+            return 0;
+        }
+    }
+
+    la_memmap_table = g_renew(struct la_memmap_entry, la_memmap_table,
+                                                      la_memmap_entries + 1);
+    la_memmap_table[la_memmap_entries].address = cpu_to_le64(address);
+    la_memmap_table[la_memmap_entries].length = cpu_to_le64(length);
+    la_memmap_table[la_memmap_entries].type = cpu_to_le32(type);
+    la_memmap_entries++;
+
+    return la_memmap_entries;
+}
+
 static uint64_t cpu_loongarch_virt_to_phys(void *opaque, uint64_t addr)
 {
     return addr & 0x1fffffffll;
@@ -232,12 +264,17 @@ static DeviceState *ls3a5000_irq_init(MachineState *machine,
     LoongarchMachineState *lsms = LOONGARCH_MACHINE(machine);
     DeviceState *extioi, *pch_pic, *pch_msi;
     SysBusDevice *d;
-    int cpu, pin, i;
+    int cpu, pin, i, id, node_id;
+    unsigned long base;
+    node_id = (machine->smp.cpus - 1) >> 2;
 
     extioi = qdev_new(TYPE_LOONGARCH_EXTIOI);
     d = SYS_BUS_DEVICE(extioi);
     sysbus_realize_and_unref(d, &error_fatal);
-    sysbus_mmio_map(d, 0, APIC_BASE);
+    for (id = 0; id <= node_id; id++) {
+        base = APIC_BASE | (uint64_t)id << LOONGARCH_NODE_SHIFT;
+        sysbus_mmio_map(d, id, base);
+    }
 
     for (i = 0; i < EXTIOI_IRQS; i++) {
         sysbus_connect_irq(d, i, qdev_get_gpio_in(extioi, i));
@@ -318,6 +355,8 @@ static void ls3a5000_virt_init(MachineState *machine)
     DeviceState *pch_pic;
     const CPUArchIdList *possible_cpus;
     MachineClass *mc = MACHINE_GET_CLASS(machine);
+    uint64_t phyAddr = 0;
+    int nb_nodes = (machine->smp.cpus - 1) / 4;
 
     if (!cpu_model) {
         cpu_model = LOONGARCH_CPU_TYPE_NAME("Loongson-3A5000");
@@ -342,6 +381,8 @@ static void ls3a5000_virt_init(MachineState *machine)
 
         machine->possible_cpus->cpus[i].cpu = cpuobj;
 
+        numa_cpu_pre_plug(&possible_cpus->cpus[i], DEVICE(cpuobj),
+                          &error_fatal);
         qdev_realize(DEVICE(cpuobj), NULL, &error_fatal);
         object_unref(cpuobj);
 
@@ -378,6 +419,22 @@ static void ls3a5000_virt_init(MachineState *machine)
     memory_region_add_subregion(address_space_mem, 0x90000000, highmem);
     offset += highram_size;
 
+    if (machine->numa_state) {
+        for (i = 1; i < machine->numa_state->num_nodes; i++) {
+            char *ramName = g_strdup_printf("loongarch.node%d.ram", i);
+            MemoryRegion *noderam = g_new(MemoryRegion, 1);
+            uint64_t node_size = machine->numa_state->nodes[i].node_mem;
+
+            memory_region_init_alias(noderam, NULL, ramName,
+                                    machine->ram, offset, node_size);
+            phyAddr = (((uint64_t)i) << LOONGARCH_NODE_SHIFT) + 0x80000000;
+            memory_region_add_subregion(address_space_mem,
+                                        phyAddr, noderam);
+            la_memmap_add_entry(phyAddr, node_size, SYSTEM_RAM);
+            offset += node_size;
+        }
+    }
+
     /* load the BIOS image. */
     filename = qemu_find_file(QEMU_FILE_TYPE_BIOS,
                               machine->firmware ?: LOONGSON3_BIOSNAME);
@@ -401,6 +458,12 @@ static void ls3a5000_virt_init(MachineState *machine)
         loaderparams.kernel_cmdline = kernel_cmdline;
         loaderparams.initrd_filename = initrd_filename;
         fw_cfg_add_kernel_info(lsms->fw_cfg);
+    }
+
+    if (lsms->fw_cfg != NULL) {
+        fw_cfg_add_file(lsms->fw_cfg, "etc/memmap",
+                        la_memmap_table,
+                        sizeof(struct la_memmap_entry) * (la_memmap_entries));
     }
 
     memory_region_init_ram(bios, NULL, "loongarch.bios",
@@ -444,11 +507,19 @@ static void ls3a5000_virt_init(MachineState *machine)
 
     pci_create_simple(pci_bus, -1, "pci-ohci");
 
-    LOONGARCH_SIMPLE_MMIO_OPS(FEATURE_REG, "loongarch_feature", 0x8);
-    LOONGARCH_SIMPLE_MMIO_OPS(VENDOR_REG, "loongarch_vendor", 0x8);
-    LOONGARCH_SIMPLE_MMIO_OPS(CPUNAME_REG, "loongarch_cpuname", 0x8);
-    LOONGARCH_SIMPLE_MMIO_OPS(MISC_FUNC_REG, "loongarch_misc", 0x8);
-    LOONGARCH_SIMPLE_MMIO_OPS(FREQ_REG, "loongarch_freq", 0x8);
+    for (i = 0; i <= nb_nodes; i++) {
+        uint64_t off = (uint64_t)i << LOONGARCH_NODE_SHIFT;
+        LOONGARCH_SIMPLE_MMIO_OPS(((hwaddr)FEATURE_REG | off),
+                                  "loongarch_feature", 0x8);
+        LOONGARCH_SIMPLE_MMIO_OPS(((hwaddr)VENDOR_REG | off),
+                                  "loongarch_vendor", 0x8);
+        LOONGARCH_SIMPLE_MMIO_OPS(((hwaddr)CPUNAME_REG | off),
+                                   "loongarch_cpuname", 0x8);
+        LOONGARCH_SIMPLE_MMIO_OPS(((hwaddr)MISC_FUNC_REG | off),
+                                  "loongarch_misc", 0x8);
+        LOONGARCH_SIMPLE_MMIO_OPS(((hwaddr)FREQ_REG | off),
+                                  "loongarch_freq", 0x8);
+    }
 }
 
 bool loongarch_is_acpi_enabled(LoongarchMachineState *lsms)
@@ -510,6 +581,22 @@ static const CPUArchIdList *loongarch_possible_cpu_arch_ids(MachineState *ms)
     return ms->possible_cpus;
 }
 
+static CpuInstanceProperties
+loongarch_cpu_index_to_props(MachineState *ms, unsigned cpu_index)
+{
+    MachineClass *mc = MACHINE_GET_CLASS(ms);
+    const CPUArchIdList *possible_cpus = mc->possible_cpu_arch_ids(ms);
+
+    assert(cpu_index < possible_cpus->len);
+    return possible_cpus->cpus[cpu_index].props;
+}
+
+static int64_t loongarch_get_default_cpu_node_id(const MachineState *ms, int idx)
+{
+    int nb_numa_nodes = ms->numa_state->num_nodes;
+    return idx % nb_numa_nodes;
+}
+
 static void loongarch_class_init(ObjectClass *oc, void *data)
 {
     MachineClass *mc = MACHINE_CLASS(oc);
@@ -517,6 +604,8 @@ static void loongarch_class_init(ObjectClass *oc, void *data)
     mc->desc = "Loongson-5000 LS7A1000 machine";
     mc->init = ls3a5000_virt_init;
     mc->possible_cpu_arch_ids = loongarch_possible_cpu_arch_ids;
+    mc->cpu_index_to_instance_props = loongarch_cpu_index_to_props;
+    mc->get_default_cpu_node_id = loongarch_get_default_cpu_node_id;
     mc->default_ram_size = 1 * GiB;
     mc->default_cpu_type = LOONGARCH_CPU_TYPE_NAME("Loongson-3A5000");
     mc->default_ram_id = "loongarch.ram";

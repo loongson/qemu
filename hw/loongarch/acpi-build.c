@@ -183,7 +183,7 @@ build_srat(GArray *table_data, BIOSLinker *linker, MachineState *machine)
         build_append_int_noprefix(table_data, 0, 1);  /* Type  */
         build_append_int_noprefix(table_data, 16, 1); /* Length */
         /* Proximity Domain [7:0] */
-        build_append_int_noprefix(table_data, 0, 1);
+        build_append_int_noprefix(table_data, core_id >> 2, 1);
         build_append_int_noprefix(table_data, core_id, 1); /* APIC ID */
         /* Flags, Table 5-36 */
         build_append_int_noprefix(table_data, 1, 4);
@@ -203,6 +203,14 @@ build_srat(GArray *table_data, BIOSLinker *linker, MachineState *machine)
     build_srat_memory(table_data, mem_base, mem_len,
                             0, MEM_AFFINITY_ENABLED);
 
+    if (machine->numa_state) {
+        for (i = 1; i < machine->numa_state->num_nodes; ++i) {
+            mem_base = (i << LOONGARCH_NODE_SHIFT) + 0x80000000;
+            mem_len = machine->numa_state->nodes[i].node_mem;
+            build_srat_memory(table_data, mem_base, mem_len,
+                                i, MEM_AFFINITY_ENABLED);
+        }
+    }
     acpi_table_end(linker, &table);
 }
 
@@ -497,6 +505,11 @@ static void acpi_build(AcpiBuildTables *tables, MachineState *machine)
 
     acpi_add_table(table_offsets, tables_blob);
     build_srat(tables_blob, tables->linker, machine);
+    if (machine->numa_state->have_numa_distance) {
+        acpi_add_table(table_offsets, tables_blob);
+        build_slit(tables_blob, tables->linker, machine, lsms->oem_id,
+                   lsms->oem_table_id);
+    }
 
     acpi_add_table(table_offsets, tables_blob);
     {
