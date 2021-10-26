@@ -9,6 +9,92 @@
 #include "qemu/osdep.h"
 #include "cpu.h"
 #include "migration/cpu.h"
+#include "internals.h"
+
+/* TLB state */
+static int get_tlb(QEMUFile *f, void *pv, size_t size,
+                   const VMStateField *field)
+{
+    loongarch_tlb *v = pv;
+
+    qemu_get_betls(f, &v->VPN);
+    qemu_get_be64s(f, &v->PageMask);
+    qemu_get_be32s(f, &v->PageSize);
+    qemu_get_be16s(f, &v->ASID);
+    qemu_get_be64s(f, &v->V0);
+    qemu_get_be64s(f, &v->V1);
+    qemu_get_be64s(f, &v->D0);
+    qemu_get_be64s(f, &v->D1);
+    qemu_get_be64s(f, &v->PLV0);
+    qemu_get_be64s(f, &v->PLV1);
+    qemu_get_be64s(f, &v->MAT0);
+    qemu_get_be64s(f, &v->MAT1);
+    qemu_get_be64s(f, &v->G);
+    qemu_get_be64s(f, &v->PPN0);
+    qemu_get_be64s(f, &v->PPN1);
+    qemu_get_be64s(f, &v->NR0);
+    qemu_get_be64s(f, &v->NR1);
+    qemu_get_be64s(f, &v->NX0);
+    qemu_get_be64s(f, &v->NX1);
+    qemu_get_be64s(f, &v->NE);
+    qemu_get_be64s(f, &v->RPLV0);
+    qemu_get_be64s(f, &v->RPLV1);
+
+    return 0;
+}
+
+static int put_tlb(QEMUFile *f, void *pv, size_t size,
+                   const VMStateField *field, JSONWriter *vmdesc)
+{
+    loongarch_tlb *v = pv;
+
+    qemu_put_betls(f, &v->VPN);
+    qemu_put_be64s(f, &v->PageMask);
+    qemu_put_be32s(f, &v->PageSize);
+    qemu_put_be16s(f, &v->ASID);
+    qemu_put_be64s(f, &v->V0);
+    qemu_put_be64s(f, &v->V1);
+    qemu_put_be64s(f, &v->D0);
+    qemu_put_be64s(f, &v->D1);
+    qemu_put_be64s(f, &v->PLV0);
+    qemu_put_be64s(f, &v->PLV1);
+    qemu_put_be64s(f, &v->MAT0);
+    qemu_put_be64s(f, &v->MAT1);
+    qemu_put_be64s(f, &v->G);
+    qemu_put_be64s(f, &v->PPN0);
+    qemu_put_be64s(f, &v->PPN1);
+    qemu_put_be64s(f, &v->NR0);
+    qemu_put_be64s(f, &v->NR1);
+    qemu_put_be64s(f, &v->NX0);
+    qemu_put_be64s(f, &v->NX1);
+    qemu_put_be64s(f, &v->NE);
+    qemu_put_be64s(f, &v->RPLV0);
+    qemu_put_be64s(f, &v->RPLV1);
+
+    return 0;
+}
+
+const VMStateInfo vmstate_info_tlb = {
+    .name = "tlb_entry",
+    .get  = get_tlb,
+    .put  = put_tlb,
+};
+
+#define VMSTATE_TLB_ARRAY_V(_f, _s, _n, _v)                     \
+    VMSTATE_ARRAY(_f, _s, _n, _v, vmstate_info_tlb, loongarch_tlb)
+
+#define VMSTATE_TLB_ARRAY(_f, _s, _n)                           \
+    VMSTATE_TLB_ARRAY_V(_f, _s, _n, 0)
+
+const VMStateDescription vmstate_tlb = {
+    .name = "cpu/tlb",
+    .version_id = 0,
+    .minimum_version_id = 0,
+    .fields = (VMStateField[]) {
+        VMSTATE_TLB_ARRAY(env.tlb, LoongArchCPU, LOONGARCH_TLB_MAX),
+        VMSTATE_END_OF_LIST()
+    }
+};
 
 /* LoongArch CPU state */
 
@@ -22,6 +108,10 @@ const VMStateDescription vmstate_loongarch_cpu = {
         VMSTATE_UINTTL(env.pc, LoongArchCPU),
         VMSTATE_UINT64_ARRAY(env.fpr, LoongArchCPU, 32),
         VMSTATE_UINT32(env.fcsr0, LoongArchCPU),
+
+        /* TLB */
+        VMSTATE_UINT32(env.stlb_size, LoongArchCPU),
+        VMSTATE_UINT32(env.mtlb_size, LoongArchCPU),
 
         /* Remaining CSR registers */
         VMSTATE_UINT64(env.CSR_CRMD, LoongArchCPU),
@@ -152,4 +242,8 @@ const VMStateDescription vmstate_loongarch_cpu = {
 
         VMSTATE_END_OF_LIST()
     },
+    .subsections = (const VMStateDescription*[]) {
+        &vmstate_tlb,
+        NULL
+    }
 };
