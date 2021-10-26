@@ -1,3 +1,4 @@
 config LOONGSON_3A5000
     bool
     select PCI_EXPRESS_7A
+    select LOONGARCH_PCH_PIC
