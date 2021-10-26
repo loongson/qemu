@@ -83,3 +83,47 @@ target_ulong helper_cpucfg(CPULoongArchState *env, target_ulong rj)
 {
     return env->cpucfg[rj];
 }
+
+#ifndef CONFIG_USER_ONLY
+void helper_ertn(CPULoongArchState *env)
+{
+    if (env->CSR_TLBRERA & 0x1) {
+        env->CSR_CRMD = FIELD_DP64(env->CSR_CRMD, CSR_CRMD, PLV,
+                                   FIELD_EX64(env->CSR_TLBRPRMD, CSR_TLBRPRMD, PPLV));
+        env->CSR_CRMD = FIELD_DP64(env->CSR_CRMD, CSR_CRMD, IE,
+                                   FIELD_EX64(env->CSR_TLBRPRMD, CSR_TLBRPRMD, PIE));
+        /* Clear Refill flag and set pc */
+        env->CSR_TLBRERA &= (~0x1);
+        env->pc = env->CSR_TLBRERA;
+        if (qemu_loglevel_mask(CPU_LOG_INT)) {
+            qemu_log("%s: TLBRERA 0x%lx\n", __func__, env->CSR_TLBRERA);
+        }
+    } else {
+        env->CSR_CRMD = FIELD_DP64(env->CSR_CRMD, CSR_CRMD, PLV,
+                                   FIELD_EX64(env->CSR_PRMD, CSR_PRMD, PPLV));
+        env->CSR_CRMD = FIELD_DP64(env->CSR_CRMD, CSR_CRMD, IE,
+                                   FIELD_EX64(env->CSR_PRMD, CSR_PRMD, PIE));
+        /* set pc*/
+        env->pc = env->CSR_ERA;
+        if (qemu_loglevel_mask(CPU_LOG_INT)) {
+            qemu_log("%s: ERA 0x%lx\n", __func__, env->CSR_ERA);
+        }
+    }
+
+    env->lladdr = 1;
+}
+
+void helper_idle(CPULoongArchState *env)
+{
+    CPUState *cs = env_cpu(env);
+
+    cs->halted = 1;
+    cpu_reset_interrupt(cs, CPU_INTERRUPT_WAKE);
+    /*
+     * Last instruction in the block, PC was updated before
+     * - no need to recover PC and icount
+     */
+    do_raise_exception(env, EXCP_HLT, 0);
+}
+
+#endif /* !CONFIG_USER_ONLY */

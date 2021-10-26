@@ -111,4 +111,8 @@ DEF_HELPER_1(tlbflush, void, env)
 DEF_HELPER_4(invtlb, void, env, tl, tl, tl)
 DEF_HELPER_2(iocsr_read, i64, env, tl)
 DEF_HELPER_4(iocsr_write, void, env, tl, tl, i32)
+DEF_HELPER_4(lddir, tl, env, tl, tl, i32)
+DEF_HELPER_4(ldpte, void, env, tl, tl, i32)
+DEF_HELPER_1(ertn, void, env)
+DEF_HELPER_1(idle, void, env)
 #endif /* !CONFIG_USER_ONLY */
