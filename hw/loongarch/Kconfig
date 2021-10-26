@@ -12,3 +12,4 @@ config LOONGSON_3A5000
     select LOONGARCH_PCH_PIC
     select LOONGARCH_PCH_MSI
     select LOONGARCH_EXTIOI
+    select LS7A_RTC
