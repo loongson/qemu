@@ -12,6 +12,7 @@
 #include "qemu/module.h"
 #include "sysemu/qtest.h"
 #include "exec/exec-all.h"
+#include "hw/qdev-properties.h"
 #include "qapi/qapi-commands-machine-target.h"
 #include "migration/vmstate.h"
 #include "cpu.h"
@@ -487,6 +488,12 @@ static ObjectClass *loongarch_cpu_class_by_name(const char *cpu_model)
     return oc;
 }
 
+static Property loongarch_cpu_properties[] = {
+    DEFINE_PROP_INT32("core-id", LoongArchCPU, core_id, -1),
+    DEFINE_PROP_UINT32("id", LoongArchCPU, id, UNASSIGNED_CPU_ID),
+    DEFINE_PROP_END_OF_LIST()
+};
+
 void loongarch_cpu_dump_state(CPUState *cs, FILE *f, int flags)
 {
     LoongArchCPU *cpu = LOONGARCH_CPU(cs);
@@ -581,6 +588,7 @@ static void loongarch_cpu_class_init(ObjectClass *c, void *data)
     device_class_set_parent_realize(dc, loongarch_cpu_realizefn,
                                     &lacc->parent_realize);
     device_class_set_parent_reset(dc, loongarch_cpu_reset, &lacc->parent_reset);
+    device_class_set_props(dc, loongarch_cpu_properties);
 
     cc->class_by_name = loongarch_cpu_class_by_name;
     cc->has_work = loongarch_cpu_has_work;
