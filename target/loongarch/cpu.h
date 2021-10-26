@@ -46,6 +46,47 @@ FIELD(FCSR0, CAUSE, 24, 5)
 extern const char * const regnames[];
 extern const char * const fregnames[];
 
+#define LOONGARCH_HFLAG_MODE   0x00003 /* LoongArch Mode*/
+#define LOONGARCH_HFLAG_UM     0x00003 /* user mode flag                     */
+#define LOONGARCH_HFLAG_KM     0x00000 /* kernel mode flag                   */
+
+#define LOONGARCH_TLB_MAX 2112 /* 2048 STLB + 64 MTLB */
+
+struct loongarch_tlb {
+    target_ulong VPN;
+    uint64_t PageMask;
+    uint32_t PageSize;
+    uint16_t ASID;
+    uint64_t V0;     /* CSR_TLBLO[0] */
+    uint64_t V1;
+
+    uint64_t D0;     /* CSR_TLBLO[1] */
+    uint64_t D1;
+
+    uint64_t PLV0;   /* CSR_TLBLO[3:2] */
+    uint64_t PLV1;
+
+    uint64_t MAT0;   /* CSR_TLBLO[5:4] */
+    uint64_t MAT1;
+
+    uint64_t G;      /* CSR_TLBLO[6] */
+
+    uint64_t PPN0;   /* CSR_TLBLO[47:12] */
+    uint64_t PPN1;
+
+    uint64_t NR0;    /* CSR_TLBLO[61] */
+    uint64_t NR1;
+
+    uint64_t NX0;    /* CSR_TLBLO[62] */
+    uint64_t NX1;
+
+    uint64_t NE;     /* CSR_TLBIDX[31] */
+
+    uint64_t RPLV0;
+    uint64_t RPLV1;  /* CSR_TLBLO[63] */
+};
+typedef struct loongarch_tlb loongarch_tlb;
+
 typedef struct CPULoongArchState CPULoongArchState;
 struct CPULoongArchState {
     uint64_t gpr[32];
@@ -195,6 +236,14 @@ struct CPULoongArchState {
     uint64_t CSR_DBG;
     uint64_t CSR_DERA;
     uint64_t CSR_DESAVE;
+
+#ifndef CONFIG_USER_ONLY
+    uint64_t      stlb_mask;
+    uint32_t      stlb_size; /* at most : 8 * 256 = 2048 */
+    uint32_t      mtlb_size; /* at most : 64 */
+    loongarch_tlb tlb[LOONGARCH_TLB_MAX];
+    int           tlbfill;
+#endif
 };
 
 /**
@@ -251,7 +300,11 @@ void loongarch_cpu_list(void);
 
 static inline int cpu_mmu_index(CPULoongArchState *env, bool ifetch)
 {
+#ifdef CONFIG_USER_ONLY
     return MMU_USER_IDX;
+#else
+    return FIELD_EX64(env->CSR_CRMD, CSR_CRMD, PLV);
+#endif
 }
 
 typedef CPULoongArchState CPUArchState;
@@ -267,8 +320,15 @@ enum {
     EXCP_BREAK,
     EXCP_INE,
     EXCP_FPE,
+    EXCP_TLBL,
+    EXCP_TLBS,
+    EXCP_INST_NOTAVAIL,
+    EXCP_TLBM,
+    EXCP_TLBPE,
+    EXCP_TLBNX,
+    EXCP_TLBNR,
 
-    EXCP_LAST = EXCP_FPE,
+    EXCP_LAST = EXCP_TLBNR,
 };
 
 #define LOONGARCH_CPU_TYPE_SUFFIX "-" TYPE_LOONGARCH_CPU
