@@ -87,7 +87,10 @@ static bool trans_csrrd(DisasContext *ctx, unsigned rd, unsigned csr)
     CASE_CSR_RDQ(SAVE5)
     CASE_CSR_RDQ(SAVE6)
     CASE_CSR_RDQ(SAVE7)
+    CASE_CSR_RDQ(TMID)
+    CASE_CSR_RDQ(TCFG)
     CASE_CSR_RDQ(CNTC)
+    CASE_CSR_RDQ(TINTCLR)
     CASE_CSR_RDQ(LLBCTL)
     CASE_CSR_RDQ(IMPCTL1)
     CASE_CSR_RDQ(IMPCTL2)
@@ -249,6 +252,7 @@ static bool trans_csrwr(DisasContext *ctx, unsigned rd, unsigned csr)
     CASE_CSR_WRQ(SAVE5)
     CASE_CSR_WRQ(SAVE6)
     CASE_CSR_WRQ(SAVE7)
+    CASE_CSR_WRQ(TMID)
     CASE_CSR_WRQ(TVAL)
     CASE_CSR_WRQ(CNTC)
     CASE_CSR_WRQ(LLBCTL)
@@ -338,6 +342,8 @@ static bool trans_csrwr(DisasContext *ctx, unsigned rd, unsigned csr)
     CASE_CSR_WRQ(DERA)
     CASE_CSR_WRQ(DESAVE)
     case LOONGARCH_CSR_ASID:
+    case LOONGARCH_CSR_TCFG:
+    case LOONGARCH_CSR_TINTCLR:
         gen_helper_csr_wrq(dest, cpu_env, src1, tcg_constant_i64(csr));
         break;
     default :
