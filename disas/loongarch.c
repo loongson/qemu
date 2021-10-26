@@ -322,6 +322,31 @@ typedef enum {
     la_op_bltu = 306,
     la_op_bgeu = 307,
 
+    /* Privileged instructions */
+    la_op_csrrd = 308,
+    la_op_csrwr = 309,
+    la_op_csrxchg = 310,
+    la_op_cacop = 311,
+    la_op_lddir = 312,
+    la_op_ldpte = 313,
+    la_op_iocsrrd_b = 314,
+    la_op_iocsrrd_h = 315,
+    la_op_iocsrrd_w = 316,
+    la_op_iocsrrd_d = 317,
+    la_op_iocsrwr_b = 318,
+    la_op_iocsrwr_h = 319,
+    la_op_iocsrwr_w = 320,
+    la_op_iocsrwr_d = 321,
+    la_op_tlbclr = 322,
+    la_op_tlbflush = 323,
+    la_op_tlbsrch = 324,
+    la_op_tlbrd = 325,
+    la_op_tlbwr = 326,
+    la_op_tlbfill = 327,
+    la_op_ertn = 328,
+    la_op_idle = 329,
+    la_op_invtlb = 330,
+
 } la_op;
 
 typedef enum {
@@ -762,6 +787,29 @@ static const  la_opcode_data opcode_data[] = {
     { "bltu", la_codec_2r_im16, la_fmt_rj_rd_offs16 },
     { "bgeu", la_codec_2r_im16, la_fmt_rj_rd_offs16 },
 
+    { "csrrd", la_codec_r_im14, la_fmt_rd_csr },
+    { "csrwr", la_codec_r_im14, la_fmt_rd_csr },
+    { "csrxchg", la_codec_2r_im14, la_fmt_rd_rj_csr },
+    { "cacop", la_codec_im5_r_im12, la_fmt_cop_rj_si12 },
+    { "lddir", la_codec_2r_im8, la_fmt_rd_rj_level },
+    { "ldpte", la_codec_r_seq, la_fmt_rj_seq },
+    { "iocsrrd.b", la_codec_2r, la_fmt_rd_rj },
+    { "iocsrrd.h", la_codec_2r, la_fmt_rd_rj },
+    { "iocsrrd.w", la_codec_2r, la_fmt_rd_rj },
+    { "iocsrrd.d", la_codec_2r, la_fmt_rd_rj },
+    { "iocsrwr.b", la_codec_2r, la_fmt_rd_rj },
+    { "iocsrwr.h", la_codec_2r, la_fmt_rd_rj },
+    { "iocsrwr.w", la_codec_2r, la_fmt_rd_rj },
+    { "iocsrwr.d", la_codec_2r, la_fmt_rd_rj },
+    { "tlbclr", la_codec_empty, la_fmt_empty },
+    { "tlbflush", la_codec_empty, la_fmt_empty },
+    { "tlbsrch", la_codec_empty, la_fmt_empty },
+    { "tlbrd", la_codec_empty, la_fmt_empty },
+    { "tlbwr", la_codec_empty, la_fmt_empty },
+    { "tlbfill", la_codec_empty, la_fmt_empty },
+    { "ertn", la_codec_empty, la_fmt_empty },
+    { "idle", la_codec_whint, la_fmt_whint },
+    { "invtlb", la_codec_invtlb, la_fmt_invtlb },
 };
 
 
@@ -1437,6 +1485,131 @@ static void decode_insn_opcode(la_decode *dec)
             break;
         case 0xf:
             op = la_op_xori;
+            break;
+        }
+        break;
+    case 0x1:
+        switch ((insn >> 24) & 0x3) {
+        case 0x0:
+            switch (insn & 0x20) {
+            case 0x0:
+                op = la_op_csrrd;
+                break;
+            case 0x1:
+                op = la_op_csrwr;
+                break;
+            default:
+                op = la_op_csrxchg;
+                break;
+            }
+            break;
+        case 0x2:
+            switch ((insn >> 22) & 0x3) {
+            case 0x0:
+                op = la_op_cacop;
+                break;
+            case 0x1:
+                switch ((insn >> 18) & 0xf) {
+                case 0x0:
+                    op = la_op_lddir;
+                    break;
+                case 0x1:
+                    switch (insn & 0x1f) {
+                    case 0x0:
+                        op = la_op_ldpte;
+                        break;
+                    }
+                    break;
+                case 0x2:
+                    switch ((insn >> 15) & 0x7) {
+                    case 0x0:
+                        switch ((insn >> 10) & 0x1f) {
+                        case 0x0:
+                            op = la_op_iocsrrd_b;
+                            break;
+                        case 0x1:
+                            op = la_op_iocsrrd_h;
+                            break;
+                        case 0x2:
+                            op = la_op_iocsrrd_w;
+                            break;
+                        case 0x3:
+                            op = la_op_iocsrrd_d;
+                            break;
+                        case 0x4:
+                            op = la_op_iocsrwr_b;
+                            break;
+                        case 0x5:
+                            op = la_op_iocsrwr_h;
+                            break;
+                        case 0x6:
+                            op = la_op_iocsrwr_w;
+                            break;
+                        case 0x7:
+                            op = la_op_iocsrwr_d;
+                            break;
+                        case 0x8:
+                            switch (insn & 0x3ff) {
+                            case 0x0:
+                                op = la_op_tlbclr;
+                                break;
+                            }
+                            break;
+                        case 0x9:
+                            switch (insn & 0x3ff) {
+                            case 0x0:
+                                op = la_op_tlbflush;
+                                break;
+                            }
+                            break;
+                        case 0xa:
+                            switch (insn & 0x3ff) {
+                            case 0x0:
+                                op = la_op_tlbsrch;
+                                break;
+                            }
+                            break;
+                        case 0xb:
+                            switch (insn & 0x3ff) {
+                            case 0x0:
+                                op = la_op_tlbrd;
+                                break;
+                            }
+                            break;
+                        case 0xc:
+                            switch (insn & 0x3ff) {
+                            case 0x0:
+                                op = la_op_tlbwr;
+                                break;
+                            }
+                            break;
+                        case 0xd:
+                            switch (insn & 0x3ff) {
+                            case 0x0:
+                                op = la_op_tlbfill;
+                                break;
+                            }
+                            break;
+                        case 0xe:
+                            switch (insn & 0x3ff) {
+                            case 0x0:
+                                op = la_op_ertn;
+                                break;
+                            }
+                            break;
+                        }
+                        break;
+                    case 0x1:
+                        op = la_op_idle;
+                        break;
+                    case 0x3:
+                        op = la_op_invtlb;
+                        break;
+                    }
+                    break;
+                }
+                break;
+            }
             break;
         }
         break;
