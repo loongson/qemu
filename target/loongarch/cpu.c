@@ -491,6 +491,7 @@ static ObjectClass *loongarch_cpu_class_by_name(const char *cpu_model)
 static Property loongarch_cpu_properties[] = {
     DEFINE_PROP_INT32("core-id", LoongArchCPU, core_id, -1),
     DEFINE_PROP_UINT32("id", LoongArchCPU, id, UNASSIGNED_CPU_ID),
+    DEFINE_PROP_INT32("node-id", LoongArchCPU, node_id, CPU_UNSET_NUMA_NODE_ID),
     DEFINE_PROP_END_OF_LIST()
 };
 
