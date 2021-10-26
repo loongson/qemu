@@ -126,4 +126,9 @@ void helper_idle(CPULoongArchState *env)
     do_raise_exception(env, EXCP_HLT, 0);
 }
 
+uint64_t helper_rdtime_d(CPULoongArchState *env)
+{
+     return cpu_loongarch_get_stable_counter(env);
+}
+
 #endif /* !CONFIG_USER_ONLY */
