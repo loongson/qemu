@@ -12,6 +12,7 @@
 #include "exec/cpu-defs.h"
 #include "fpu/softfloat-types.h"
 #include "hw/registerfields.h"
+#include "cpu-csr.h"
 
 #define TCG_GUEST_DEFAULT_MO (0)
 
@@ -68,6 +69,132 @@ struct CPULoongArchState {
     uint64_t llval;
 
     uint64_t badaddr;
+
+    /* LoongArch CSR registers */
+    uint64_t CSR_CRMD;
+    uint64_t CSR_PRMD;
+    uint64_t CSR_EUEN;
+    uint64_t CSR_MISC;
+    uint64_t CSR_ECFG;
+    uint64_t CSR_ESTAT;
+    uint64_t CSR_ERA;
+    uint64_t CSR_BADV;
+    uint64_t CSR_BADI;
+    uint64_t CSR_EENTRY;
+    uint64_t CSR_TLBIDX;
+    uint64_t CSR_TLBEHI;
+    uint64_t CSR_TLBELO0;
+    uint64_t CSR_TLBELO1;
+    uint64_t CSR_ASID;
+    uint64_t CSR_PGDL;
+    uint64_t CSR_PGDH;
+    uint64_t CSR_PGD;
+    uint64_t CSR_PWCL;
+    uint64_t CSR_PWCH;
+    uint64_t CSR_STLBPS;
+    uint64_t CSR_RVACFG;
+    uint64_t CSR_CPUID;
+    uint64_t CSR_PRCFG1;
+    uint64_t CSR_PRCFG2;
+    uint64_t CSR_PRCFG3;
+    uint64_t CSR_SAVE0;
+    uint64_t CSR_SAVE1;
+    uint64_t CSR_SAVE2;
+    uint64_t CSR_SAVE3;
+    uint64_t CSR_SAVE4;
+    uint64_t CSR_SAVE5;
+    uint64_t CSR_SAVE6;
+    uint64_t CSR_SAVE7;
+    uint64_t CSR_TMID;
+    uint64_t CSR_TCFG;
+    uint64_t CSR_TVAL;
+    uint64_t CSR_CNTC;
+    uint64_t CSR_TINTCLR;
+    uint64_t CSR_LLBCTL;
+    uint64_t CSR_IMPCTL1;
+    uint64_t CSR_IMPCTL2;
+    uint64_t CSR_TLBRENTRY;
+    uint64_t CSR_TLBRBADV;
+    uint64_t CSR_TLBRERA;
+    uint64_t CSR_TLBRSAVE;
+    uint64_t CSR_TLBRELO0;
+    uint64_t CSR_TLBRELO1;
+    uint64_t CSR_TLBREHI;
+    uint64_t CSR_TLBRPRMD;
+    uint64_t CSR_MERRCTL;
+    uint64_t CSR_MERRINFO;
+    uint64_t CSR_MERRINFO1;
+    uint64_t CSR_MERRENT;
+    uint64_t CSR_MERRERA;
+    uint64_t CSR_MERRSAVE;
+    uint64_t CSR_CTAG;
+    uint64_t CSR_DMWIN0;
+    uint64_t CSR_DMWIN1;
+    uint64_t CSR_DMWIN2;
+    uint64_t CSR_DMWIN3;
+    uint64_t CSR_PERFCTRL0;
+    uint64_t CSR_PERFCNTR0;
+    uint64_t CSR_PERFCTRL1;
+    uint64_t CSR_PERFCNTR1;
+    uint64_t CSR_PERFCTRL2;
+    uint64_t CSR_PERFCNTR2;
+    uint64_t CSR_PERFCTRL3;
+    uint64_t CSR_PERFCNTR3;
+    uint64_t CSR_MWPC;
+    uint64_t CSR_MWPS;
+    uint64_t CSR_DB0ADDR;
+    uint64_t CSR_DB0MASK;
+    uint64_t CSR_DB0CTL;
+    uint64_t CSR_DB0ASID;
+    uint64_t CSR_DB1ADDR;
+    uint64_t CSR_DB1MASK;
+    uint64_t CSR_DB1CTL;
+    uint64_t CSR_DB1ASID;
+    uint64_t CSR_DB2ADDR;
+    uint64_t CSR_DB2MASK;
+    uint64_t CSR_DB2CTL;
+    uint64_t CSR_DB2ASID;
+    uint64_t CSR_DB3ADDR;
+    uint64_t CSR_DB3MASK;
+    uint64_t CSR_DB3CTL;
+    uint64_t CSR_DB3ASID;
+    uint64_t CSR_FWPC;
+    uint64_t CSR_FWPS;
+    uint64_t CSR_IB0ADDR;
+    uint64_t CSR_IB0MASK;
+    uint64_t CSR_IB0CTL;
+    uint64_t CSR_IB0ASID;
+    uint64_t CSR_IB1ADDR;
+    uint64_t CSR_IB1MASK;
+    uint64_t CSR_IB1CTL;
+    uint64_t CSR_IB1ASID;
+    uint64_t CSR_IB2ADDR;
+    uint64_t CSR_IB2MASK;
+    uint64_t CSR_IB2CTL;
+    uint64_t CSR_IB2ASID;
+    uint64_t CSR_IB3ADDR;
+    uint64_t CSR_IB3MASK;
+    uint64_t CSR_IB3CTL;
+    uint64_t CSR_IB3ASID;
+    uint64_t CSR_IB4ADDR;
+    uint64_t CSR_IB4MASK;
+    uint64_t CSR_IB4CTL;
+    uint64_t CSR_IB4ASID;
+    uint64_t CSR_IB5ADDR;
+    uint64_t CSR_IB5MASK;
+    uint64_t CSR_IB5CTL;
+    uint64_t CSR_IB5ASID;
+    uint64_t CSR_IB6ADDR;
+    uint64_t CSR_IB6MASK;
+    uint64_t CSR_IB6CTL;
+    uint64_t CSR_IB6ASID;
+    uint64_t CSR_IB7ADDR;
+    uint64_t CSR_IB7MASK;
+    uint64_t CSR_IB7CTL;
+    uint64_t CSR_IB7ASID;
+    uint64_t CSR_DBG;
+    uint64_t CSR_DERA;
+    uint64_t CSR_DESAVE;
 };
 
 /**
