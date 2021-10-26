@@ -13,6 +13,7 @@
 #include "sysemu/qtest.h"
 #include "exec/exec-all.h"
 #include "qapi/qapi-commands-machine-target.h"
+#include "migration/vmstate.h"
 #include "cpu.h"
 #include "internals.h"
 #include "fpu/softfloat-helpers.h"
@@ -278,6 +279,9 @@ static void loongarch_cpu_class_init(ObjectClass *c, void *data)
     cc->has_work = loongarch_cpu_has_work;
     cc->dump_state = loongarch_cpu_dump_state;
     cc->set_pc = loongarch_cpu_set_pc;
+#ifndef CONFIG_USER_ONLY
+    dc->vmsd = &vmstate_loongarch_cpu;
+#endif
     cc->disas_set_info = loongarch_cpu_disas_set_info;
 #ifdef CONFIG_TCG
     cc->tcg_ops = &loongarch_tcg_ops;
