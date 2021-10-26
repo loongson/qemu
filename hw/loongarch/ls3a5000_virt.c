@@ -113,6 +113,7 @@ static void ls3a5000_virt_init(MachineState *machine)
     char *ramName = NULL;
     ram_addr_t ram_size = machine->ram_size;
     MemoryRegion *address_space_mem = get_system_memory();
+    LoongarchMachineState *lsms = LOONGARCH_MACHINE(machine);
     int i;
     MemoryRegion *iomem = NULL;
 
@@ -148,6 +149,7 @@ static void ls3a5000_virt_init(MachineState *machine)
         /* Init CPU internal devices */
         cpu_loongarch_init_irq(cpu);
         cpu_loongarch_clock_init(cpu);
+        cpu_init_ipi(lsms, env->irq[IRQ_IPI], i);
         qemu_register_reset(main_cpu_reset, cpu);
     }
 

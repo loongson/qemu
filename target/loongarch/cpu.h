@@ -50,6 +50,7 @@ extern const char * const fregnames[];
 
 #define N_IRQS      14
 #define IRQ_TIMER   11
+#define IRQ_IPI     12
 
 #define LOONGARCH_HFLAG_MODE   0x00003 /* LoongArch Mode*/
 #define LOONGARCH_HFLAG_UM     0x00003 /* user mode flag                     */
