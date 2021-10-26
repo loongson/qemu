@@ -145,6 +145,8 @@ static void ls3a5000_virt_init(MachineState *machine)
         env = &cpu->env;
         cpu_states[i] = env;
 
+        /* Init CPU internal devices */
+        cpu_loongarch_init_irq(cpu);
         cpu_loongarch_clock_init(cpu);
         qemu_register_reset(main_cpu_reset, cpu);
     }
