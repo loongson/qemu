@@ -269,6 +269,7 @@ struct LoongArchCPU {
     CPULoongArchState env;
     uint32_t id;
     int32_t core_id;
+    int32_t node_id; /* NUMA node this CPU belongs to */
 };
 
 #define TYPE_LOONGARCH_CPU "loongarch64-cpu"
