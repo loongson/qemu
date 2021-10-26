@@ -31,6 +31,10 @@
 #define LOONGARCH_PCH_IRQ_BASE  64
 #define LS7A_UART_IRQ           (LOONGARCH_PCH_IRQ_BASE + 2)
 #define LS7A_UART_BASE          0x1fe001e0
+#define LS7A_RTC_IRQ            (LOONGARCH_PCH_IRQ_BASE + 3)
+#define LS7A_MISC_REG_BASE      (LS7A_PCH_REG_BASE + 0x00080000)
+#define LS7A_RTC_REG_BASE       (LS7A_MISC_REG_BASE + 0x00050100)
+#define LS7A_RTC_LEN            0x100
 
 typedef struct LS7APCIState LS7APCIState;
 typedef struct LS7APCIEHost {
