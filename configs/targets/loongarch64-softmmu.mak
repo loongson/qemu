@@ -1,0 +1,2 @@
+TARGET_ARCH=loongarch64
+TARGET_BASE_ARCH=loongarch
