@@ -16,6 +16,8 @@
 
 #define TCG_GUEST_DEFAULT_MO (0)
 
+#define UNASSIGNED_CPU_ID 0xFFFFFFFF
+
 #define FCSR0_M1    0x1f         /* FCSR1 mask, Enables */
 #define FCSR0_M2    0x1f1f0000   /* FCSR2 mask, Cause and Flags */
 #define FCSR0_M3    0x300        /* FCSR3 mask, Round Mode */
@@ -264,6 +266,8 @@ struct LoongArchCPU {
 
     CPUNegativeOffsetState neg;
     CPULoongArchState env;
+    uint32_t id;
+    int32_t core_id;
 };
 
 #define TYPE_LOONGARCH_CPU "loongarch64-cpu"
