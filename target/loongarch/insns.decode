@@ -41,6 +41,7 @@
 %offs21  0:s5 10:16
 %offs16  10:s16
 %offs    0:s10 10:16
+%csr     10:14
 
 #
 # Argument sets
@@ -82,6 +83,7 @@
 &fmt_rdrjoffs16     rd rj offs16
 &fmt_offs           offs
 &fmt_rjrdoffs16     rj rd offs16
+&fmt_rdrjcsr        rd rj csr
 
 #
 # Formats
@@ -123,6 +125,7 @@
 @fmt_rdrjoffs16      .... .. ................ ..... .....     &fmt_rdrjoffs16     %rd %rj %offs16
 @fmt_offs            .... .. ..........................       &fmt_offs           %offs
 @fmt_rjrdoffs16      .... .. ................ ..... .....     &fmt_rjrdoffs16     %rj %rd %offs16
+@fmt_rdrjcsr         .... .... .............. ..... .....     &fmt_rdrjcsr        %rd %rj %csr
 
 #
 # Fixed point arithmetic operation instruction
@@ -478,3 +481,16 @@ blt              0110 00 ................ ..... .....     @fmt_rjrdoffs16
 bge              0110 01 ................ ..... .....     @fmt_rjrdoffs16
 bltu             0110 10 ................ ..... .....     @fmt_rjrdoffs16
 bgeu             0110 11 ................ ..... .....     @fmt_rjrdoffs16
+
+#
+# Core instructions
+#
+csrxchg          0000 0100 .............. ..... .....     @fmt_rdrjcsr
+iocsrrd_b        0000 01100100 10000 00000 ..... .....    @fmt_rdrj
+iocsrrd_h        0000 01100100 10000 00001 ..... .....    @fmt_rdrj
+iocsrrd_w        0000 01100100 10000 00010 ..... .....    @fmt_rdrj
+iocsrrd_d        0000 01100100 10000 00011 ..... .....    @fmt_rdrj
+iocsrwr_b        0000 01100100 10000 00100 ..... .....    @fmt_rdrj
+iocsrwr_h        0000 01100100 10000 00101 ..... .....    @fmt_rdrj
+iocsrwr_w        0000 01100100 10000 00110 ..... .....    @fmt_rdrj
+iocsrwr_d        0000 01100100 10000 00111 ..... .....    @fmt_rdrj
