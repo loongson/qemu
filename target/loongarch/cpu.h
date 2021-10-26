@@ -46,6 +46,9 @@ FIELD(FCSR0, CAUSE, 24, 5)
 extern const char * const regnames[];
 extern const char * const fregnames[];
 
+#define N_IRQS      14
+#define IRQ_TIMER   11
+
 #define LOONGARCH_HFLAG_MODE   0x00003 /* LoongArch Mode*/
 #define LOONGARCH_HFLAG_UM     0x00003 /* user mode flag                     */
 #define LOONGARCH_HFLAG_KM     0x00000 /* kernel mode flag                   */
@@ -244,6 +247,8 @@ struct CPULoongArchState {
     loongarch_tlb tlb[LOONGARCH_TLB_MAX];
     int           tlbfill;
 #endif
+    void *irq[N_IRQS];
+    QEMUTimer *timer; /* Internal timer */
 };
 
 /**
@@ -341,4 +346,9 @@ enum {
 #define LOONGARCH_CPU_TYPE_NAME(model) model LOONGARCH_CPU_TYPE_SUFFIX
 #define CPU_RESOLVING_TYPE TYPE_LOONGARCH_CPU
 
+void cpu_loongarch_clock_init(LoongArchCPU *cpu);
+uint64_t cpu_loongarch_get_stable_counter(CPULoongArchState *env);
+uint64_t cpu_loongarch_get_stable_timer_ticks(CPULoongArchState *env);
+void cpu_loongarch_store_stable_timer_config(CPULoongArchState *env,
+                                             uint64_t value);
 #endif /* LOONGARCH_CPU_H */
