@@ -106,6 +106,26 @@ static void set_loongarch_cpucfg(CPULoongArchState *env)
     env->cpucfg[20] = 0x60f000f;
 }
 
+static void set_loongarch_csr(CPULoongArchState *env)
+{
+    uint64_t t;
+    CPUState *cs = env_cpu(env);
+
+    t = FIELD_DP64(0, CSR_CRMD, PLV, 0);
+    t = FIELD_DP64(t, CSR_CRMD, IE, 0);
+    t = FIELD_DP64(t, CSR_CRMD, DA, 1);
+    t = FIELD_DP64(t, CSR_CRMD, PG, 0);
+    t = FIELD_DP64(t, CSR_CRMD, DATF, 1);
+    t = FIELD_DP64(t, CSR_CRMD, DATM, 1);
+    env->CSR_CRMD = t;
+
+    env->CSR_STLBPS  = 0xe;
+    env->CSR_ASID = 0xa0000;
+    env->CSR_ERA = env->pc;
+    env->CSR_CPUID = (cs->cpu_index & 0x1ff);
+    env->CSR_TMID = cs->cpu_index;
+}
+
 /* LoongArch CPU definitions */
 static void loongarch_3a5000_initfn(Object *obj)
 {
@@ -113,6 +133,7 @@ static void loongarch_3a5000_initfn(Object *obj)
     CPULoongArchState *env = &cpu->env;
 
     set_loongarch_cpucfg(env);
+    set_loongarch_csr(env);
 }
 
 static void loongarch_cpu_list_entry(gpointer data, gpointer user_data)
@@ -140,6 +161,7 @@ static void loongarch_cpu_reset(DeviceState *dev)
     lacc->parent_reset(dev);
 
     set_loongarch_cpucfg(env);
+    set_loongarch_csr(env);
     env->fcsr0_mask = 0x1f1f031f;
     env->fcsr0 = 0x0;
 
