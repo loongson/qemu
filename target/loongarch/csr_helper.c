@@ -14,6 +14,7 @@
 #include "exec/helper-proto.h"
 #include "exec/exec-all.h"
 #include "exec/cpu_ldst.h"
+#include "hw/irq.h"
 #include "cpu-csr.h"
 #include "tcg/tcg-ldst.h"
 
@@ -34,6 +35,9 @@ target_ulong helper_csr_rdq(CPULoongArchState *env, uint64_t csr)
         } else {
             v = env->CSR_PGDL;
         }
+        break;
+    case LOONGARCH_CSR_TVAL:
+        v = cpu_loongarch_get_stable_timer_ticks(env);
         break;
     default :
         assert(0);
@@ -56,6 +60,16 @@ target_ulong helper_csr_wrq(CPULoongArchState *env, target_ulong val,
             tlb_flush(env_cpu(env));
         }
         break;
+    case LOONGARCH_CSR_TCFG:
+        old_v = env->CSR_TCFG;
+        cpu_loongarch_store_stable_timer_config(env, val);
+        break;
+    case LOONGARCH_CSR_TINTCLR:
+        old_v = 0;
+        qemu_irq_lower(env->irq[IRQ_TIMER]);
+        break;
+    default :
+        assert(0);
     }
 
     return old_v;
@@ -64,6 +78,7 @@ target_ulong helper_csr_wrq(CPULoongArchState *env, target_ulong val,
 target_ulong helper_csr_xchgq(CPULoongArchState *env, target_ulong val,
                               target_ulong mask, uint64_t csr)
 {
+    target_ulong tmp;
     target_ulong v = val & mask;
 
 #define CASE_CSR_XCHGQ(csr)                                 \
@@ -110,8 +125,16 @@ target_ulong helper_csr_xchgq(CPULoongArchState *env, target_ulong val,
     CASE_CSR_XCHGQ(SAVE5)
     CASE_CSR_XCHGQ(SAVE6)
     CASE_CSR_XCHGQ(SAVE7)
+    CASE_CSR_XCHGQ(TMID)
+    case LOONGARCH_CSR_TCFG:
+        val = env->CSR_TCFG;
+        tmp = val & ~mask;
+        tmp |= v;
+        cpu_loongarch_store_stable_timer_config(env, tmp);
+        break;
     CASE_CSR_XCHGQ(TVAL)
     CASE_CSR_XCHGQ(CNTC)
+    CASE_CSR_XCHGQ(TINTCLR)
     CASE_CSR_XCHGQ(LLBCTL)
     CASE_CSR_XCHGQ(IMPCTL1)
     CASE_CSR_XCHGQ(IMPCTL2)
