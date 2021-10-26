@@ -45,6 +45,7 @@ static const char * const excp_names[EXCP_LAST + 1] = {
     [EXCP_TLBPE] = "TLB priviledged error",
     [EXCP_TLBNX] = "TLB execute-inhibit",
     [EXCP_TLBNR] = "TLB read-inhibit",
+    [EXCP_DBP] = "debug breakpoint",
 };
 
 const char *loongarch_exception_name(int32_t exception)

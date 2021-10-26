@@ -34,6 +34,12 @@ GEN_FALSE_TRANS(tlbfill)
 GEN_FALSE_TRANS(tlbclr)
 GEN_FALSE_TRANS(tlbflush)
 GEN_FALSE_TRANS(invtlb)
+GEN_FALSE_TRANS(cacop)
+GEN_FALSE_TRANS(ldpte)
+GEN_FALSE_TRANS(lddir)
+GEN_FALSE_TRANS(ertn)
+GEN_FALSE_TRANS(dbcl)
+GEN_FALSE_TRANS(idle)
 
 #else
 static bool trans_csrrd(DisasContext *ctx, unsigned rd, unsigned csr)
@@ -443,6 +449,12 @@ static bool trans_iocsrwr_d(DisasContext *ctx, arg_iocsrwr_d *a)
     return true;
 }
 
+static bool trans_cacop(DisasContext *ctx, arg_cacop *a)
+{
+    /* treat the cacop as a nop */
+    return true;
+}
+
 static bool trans_tlbsrch(DisasContext *ctx, arg_tlbsrch *a)
 {
     gen_helper_tlbsrch(cpu_env);
@@ -489,4 +501,47 @@ static bool trans_invtlb(DisasContext *ctx, arg_invtlb *a)
     return true;
 }
 
+static bool trans_ldpte(DisasContext *ctx, arg_ldpte *a)
+{
+    TCGv_i32 mem_idx = tcg_constant_i32(ctx->mem_idx);
+    TCGv src1 = gpr_src(ctx, a->rj, EXT_NONE);
+
+    gen_helper_ldpte(cpu_env, src1, tcg_constant_tl(a->seq), mem_idx);
+    return true;
+}
+
+static bool trans_lddir(DisasContext *ctx, arg_lddir *a)
+{
+    TCGv_i32 mem_idx = tcg_constant_i32(ctx->mem_idx);
+    TCGv src = gpr_src(ctx, a->rj, EXT_NONE);
+    TCGv dest = gpr_dst(ctx, a->rd, EXT_NONE);
+
+    gen_helper_lddir(dest, cpu_env, src, tcg_constant_tl(a->level), mem_idx);
+    return true;
+}
+
+static bool trans_ertn(DisasContext *ctx, arg_ertn *a)
+{
+    gen_helper_ertn(cpu_env);
+    ctx->base.is_jmp = DISAS_EXIT;
+    return true;
+}
+
+static bool trans_dbcl(DisasContext *ctx, arg_dbcl *a)
+{
+    /*
+     * XXX: not clear which exception should be raised
+     *      when in debug mode...
+     */
+    generate_exception(ctx, EXCP_DBP);
+    return true;
+}
+
+static bool trans_idle(DisasContext *ctx, arg_idle *a)
+{
+    tcg_gen_movi_tl(cpu_pc, ctx->base.pc_next + 4);
+    gen_helper_idle(cpu_env);
+    ctx->base.is_jmp = DISAS_NORETURN;
+    return true;
+}
 #endif
