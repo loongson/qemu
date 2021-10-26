@@ -38,6 +38,13 @@ static const char * const excp_names[EXCP_LAST + 1] = {
     [EXCP_BREAK] = "Break",
     [EXCP_INE] = "Inst. Not Exist",
     [EXCP_FPE] = "Floating Point Exception",
+    [EXCP_TLBL] = "TLB load",
+    [EXCP_TLBS] = "TLB store",
+    [EXCP_INST_NOTAVAIL] = "TLB inst not exist",
+    [EXCP_TLBM] = "TLB modify",
+    [EXCP_TLBPE] = "TLB priviledged error",
+    [EXCP_TLBNX] = "TLB execute-inhibit",
+    [EXCP_TLBNR] = "TLB read-inhibit",
 };
 
 const char *loongarch_exception_name(int32_t exception)
@@ -178,6 +185,10 @@ static void loongarch_cpu_disas_set_info(CPUState *s, disassemble_info *info)
 static void loongarch_cpu_realizefn(DeviceState *dev, Error **errp)
 {
     CPUState *cs = CPU(dev);
+#ifndef CONFIG_USER_ONLY
+    LoongArchCPU *cpu = LOONGARCH_CPU(dev);
+    CPULoongArchState *env = &cpu->env;
+#endif
     LoongArchCPUClass *lacc = LOONGARCH_CPU_GET_CLASS(dev);
     Error *local_err = NULL;
 
@@ -186,6 +197,10 @@ static void loongarch_cpu_realizefn(DeviceState *dev, Error **errp)
         error_propagate(errp, local_err);
         return;
     }
+
+#ifndef CONFIG_USER_ONLY
+    loongarch_mmu_init(env);
+#endif
 
     cpu_reset(cs);
     qemu_init_vcpu(cs);
@@ -243,9 +258,18 @@ void loongarch_cpu_dump_state(CPUState *cs, FILE *f, int flags)
     }
 }
 
+#ifndef CONFIG_USER_ONLY
+#include "hw/core/sysemu-cpu-ops.h"
+
+static const struct SysemuCPUOps loongarch_sysemu_ops = {
+    .get_phys_page_debug = loongarch_cpu_get_phys_page_debug,
+};
+#endif
+
 #ifdef CONFIG_TCG
 #include "hw/core/tcg-cpu-ops.h"
 
+#ifdef CONFIG_USER_ONLY
 static bool loongarch_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
                        MMUAccessType access_type, int mmu_idx,
                        bool probe, uintptr_t retaddr)
@@ -257,6 +281,7 @@ static bool loongarch_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
     cs->exception_index = EXCP_ADE;
     do_raise_exception(env, cs->exception_index, retaddr);
 }
+#endif
 
 static struct TCGCPUOps loongarch_tcg_ops = {
     .initialize = loongarch_translate_init,
@@ -281,6 +306,7 @@ static void loongarch_cpu_class_init(ObjectClass *c, void *data)
     cc->set_pc = loongarch_cpu_set_pc;
 #ifndef CONFIG_USER_ONLY
     dc->vmsd = &vmstate_loongarch_cpu;
+    cc->sysemu_ops = &loongarch_sysemu_ops;
 #endif
     cc->disas_set_info = loongarch_cpu_disas_set_info;
 #ifdef CONFIG_TCG
