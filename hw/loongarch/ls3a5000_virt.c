@@ -27,6 +27,7 @@
 #include "hw/pci-host/ls7a.h"
 #include "hw/misc/unimp.h"
 #include "hw/loongarch/fw_cfg.h"
+#include "hw/firmware/smbios.h"
 
 #define LOONGSON3_BIOSNAME "loongarch_bios.bin"
 
@@ -100,6 +101,43 @@ static void fw_cfg_add_kernel_info(FWCfgState *fw_cfg)
 
     fw_cfg_add_i32(fw_cfg, FW_CFG_CMDLINE_SIZE, ret);
     fw_cfg_add_string(fw_cfg, FW_CFG_CMDLINE_DATA, (const char *)cmdline_buf);
+}
+
+static void loongarch_build_smbios(LoongarchMachineState *lsms)
+{
+    MachineState *ms = MACHINE(lsms);
+    MachineClass *mc = MACHINE_GET_CLASS(lsms);
+    uint8_t *smbios_tables, *smbios_anchor;
+    size_t smbios_tables_len, smbios_anchor_len;
+    const char *product = "QEMU Virtual Machine";
+    ms->smp.cores = 4;
+
+    if (!lsms->fw_cfg) {
+        return;
+    }
+
+    product = "Loongarch-3A5K-7A1000-TCG";
+
+    smbios_set_defaults("QEMU", product, mc->name, false,
+                        true, SMBIOS_ENTRY_POINT_30);
+
+    smbios_get_tables(ms, NULL, 0, &smbios_tables, &smbios_tables_len,
+                      &smbios_anchor, &smbios_anchor_len, &error_fatal);
+
+    if (smbios_anchor) {
+        fw_cfg_add_file(lsms->fw_cfg, "etc/smbios/smbios-tables",
+                        smbios_tables, smbios_tables_len);
+        fw_cfg_add_file(lsms->fw_cfg, "etc/smbios/smbios-anchor",
+                        smbios_anchor, smbios_anchor_len);
+    }
+}
+
+static
+void loongarch_machine_done(Notifier *notifier, void *data)
+{
+    LoongarchMachineState *lsms = container_of(notifier,
+                                        LoongarchMachineState, machine_done);
+    loongarch_build_smbios(lsms);
 }
 
 static void main_cpu_reset(void *opaque)
@@ -357,6 +395,9 @@ static void ls3a5000_virt_init(MachineState *machine)
                            LA_BIOS_SIZE, &error_fatal);
     memory_region_set_readonly(bios, true);
     memory_region_add_subregion(get_system_memory(), LA_BIOS_BASE, bios);
+
+    lsms->machine_done.notify = loongarch_machine_done;
+    qemu_add_machine_init_done_notifier(&lsms->machine_done);
 
     /*Add PM mmio memory for reboot and shutdown*/
     iomem = g_new(MemoryRegion, 1);

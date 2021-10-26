@@ -50,6 +50,8 @@ typedef struct LoongarchMachineState {
     /*< private >*/
     MachineState parent_obj;
 
+    /* State for other subsystems/APIs: */
+    Notifier machine_done;
     gipiState   *gipi;
     qemu_irq    *pch_irq;
     FWCfgState  *fw_cfg;
