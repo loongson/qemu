@@ -35,6 +35,10 @@
 #define CPUNAME_REG             0x1fe00020
 #define MISC_FUNC_REG           0x1fe00420
 #define FREQ_REG                0x1fe001d0
+#define FW_CFG_ADDR             0x1e020000
+
+#define LA_BIOS_BASE            0x1c000000
+#define LA_BIOS_SIZE            (4 * 1024 * 1024)
 
 typedef struct LoongarchMachineState {
     /*< private >*/
@@ -42,6 +46,7 @@ typedef struct LoongarchMachineState {
 
     gipiState   *gipi;
     qemu_irq    *pch_irq;
+    FWCfgState  *fw_cfg;
 } LoongarchMachineState;
 
 #define TYPE_LOONGARCH_MACHINE  MACHINE_TYPE_NAME("loongson7a")
