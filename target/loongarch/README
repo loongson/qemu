@@ -71,6 +71,27 @@
       ./qemu-loongarch64  /opt/clfs/usr/bin/pwd
       ...
 
+- Softmmu emulation
+
+  We support softmmu emulation int the following series patches.
+  Mainly emulate a virt 3A5000 board that is not exactly the same the host.
+  The kernel needs to be modified for the tcg. Kernel code is on the github
+  and the uefi code will be opened in the near future. All required binaries
+  will be provided for test.
+
+  1.Download kernel and the cross-tools.(vmlinux)
+
+      wget https://github.com/loongson/linux
+      wget https://github.com/loongson/build-tools/releases/latest/download/loongarch64-clfs-20210831-cross-tools.tar.xz
+
+  2.Download the clfs-system and made a ramdisk with busybox.(ramdisk)
+
+  3.Run with command,eg:
+
+   ./build/qemu-system-loongarch64 -m 4G -smp 16 --cpu Loongson-3A5000 --machine loongson7a -kernel ./vmlinux -initrd ./ramdisk  -append "root=/dev/ram console=ttyS0,115200 rdinit=/sbin/init loglevel=8" -monitor tcp::4000,server,nowait -nographic
+
+The vmlinux and ramdisk binary can get from :
+    git clone https://github.com/yangxiaojuan-loongson/qemu-binary
 
 - Note.
   We can get the latest LoongArch documents or LoongArch tools at https://github.com/loongson/
