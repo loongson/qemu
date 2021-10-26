@@ -143,6 +143,9 @@ static void ls3a5000_irq_init(MachineState *machine, CPULoongArchState *env[])
                    qdev_get_gpio_in(pch_pic, LS7A_UART_IRQ - 64),
                    115200, serial_hd(0), DEVICE_NATIVE_ENDIAN);
 
+    sysbus_create_simple("ls7a_rtc", LS7A_RTC_REG_BASE,
+                  qdev_get_gpio_in(pch_pic, LS7A_RTC_IRQ - 64));
+
     for (int i = 0; i < 32; i++) {
         sysbus_connect_irq(d, i, lsms->pch_irq[i]);
     }
