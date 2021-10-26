@@ -11,8 +11,11 @@
 #include "qemu/datadir.h"
 #include "qapi/error.h"
 #include "hw/boards.h"
+#include "hw/char/serial.h"
 #include "sysemu/sysemu.h"
 #include "sysemu/qtest.h"
+#include "hw/irq.h"
+#include "net/net.h"
 #include "sysemu/runstate.h"
 #include "sysemu/reset.h"
 #include "hw/loongarch/loongarch.h"
@@ -20,6 +23,7 @@
 #include "hw/intc/loongarch_pch_pic.h"
 #include "hw/intc/loongarch_pch_msi.h"
 #include "hw/pci-host/ls7a.h"
+#include "hw/misc/unimp.h"
 
 CPULoongArchState *cpu_states[LOONGARCH_MAX_VCPUS];
 
@@ -135,6 +139,10 @@ static void ls3a5000_irq_init(MachineState *machine, CPULoongArchState *env[])
     sysbus_realize_and_unref(d, &error_fatal);
     sysbus_mmio_map(d, 0, LS7A_IOAPIC_REG_BASE);
 
+    serial_mm_init(get_system_memory(), LS7A_UART_BASE, 0,
+                   qdev_get_gpio_in(pch_pic, LS7A_UART_IRQ - 64),
+                   115200, serial_hd(0), DEVICE_NATIVE_ENDIAN);
+
     for (int i = 0; i < 32; i++) {
         sysbus_connect_irq(d, i, lsms->pch_irq[i]);
     }
@@ -147,6 +155,22 @@ static void ls3a5000_irq_init(MachineState *machine, CPULoongArchState *env[])
         sysbus_connect_irq(d, i, lsms->pch_irq[i + 32]);
     }
 
+}
+
+/* Network support */
+static void network_init(PCIBus *pci_bus)
+{
+    int i;
+
+    for (i = 0; i < nb_nics; i++) {
+        NICInfo *nd = &nd_table[i];
+
+        if (!nd->model) {
+            nd->model = g_strdup("virtio");
+        }
+
+        pci_nic_init_nofail(nd, pci_bus, nd->model, NULL);
+    }
 }
 
 static void ls3a5000_virt_init(MachineState *machine)
@@ -162,6 +186,7 @@ static void ls3a5000_virt_init(MachineState *machine)
     LoongarchMachineState *lsms = LOONGARCH_MACHINE(machine);
     int i;
     MemoryRegion *iomem = NULL;
+    PCIBus *pci_bus = NULL;
 
     if (!cpu_model) {
         cpu_model = LOONGARCH_CPU_TYPE_NAME("Loongson-3A5000");
@@ -220,9 +245,32 @@ static void ls3a5000_virt_init(MachineState *machine)
                           "loongarch_pm", PM_MMIO_SIZE);
     memory_region_add_subregion(address_space_mem,
                                 PM_MMIO_ADDR, iomem);
+    /*
+     * There are some invalid guest memory access.
+     * Create some unimplemented devices to emulate this.
+     */
+    create_unimplemented_device("ls7a-lpc", 0x10002000, 0x14);
+    create_unimplemented_device("pci-dma-cfg", 0x1001041c, 0x4);
+    create_unimplemented_device("node-bridge", 0xEFDFB000274, 0x4);
+    create_unimplemented_device("ls7a-lionlpc", 0x1fe01400, 0x38);
+    create_unimplemented_device("ls7a-node0", 0x0EFDFB000274, 0x4);
+    create_unimplemented_device("ls7a-node1", 0x1EFDFB000274, 0x4);
+    create_unimplemented_device("ls7a-node2", 0x2EFDFB000274, 0x4);
+    create_unimplemented_device("ls7a-node3", 0x3EFDFB000274, 0x4);
 
     /*Initialize the IO interrupt subsystem*/
     ls3a5000_irq_init(machine, cpu_states);
+
+    /* Init the north bridge */
+    pci_bus = ls7a_init(machine, lsms->pch_irq);
+
+    /*network card*/
+    network_init(pci_bus);
+
+    /* VGA setup.  Don't bother loading the bios.  */
+    pci_vga_init(pci_bus);
+
+    pci_create_simple(pci_bus, -1, "pci-ohci");
 
     LOONGARCH_SIMPLE_MMIO_OPS(FEATURE_REG, "loongarch_feature", 0x8);
     LOONGARCH_SIMPLE_MMIO_OPS(VENDOR_REG, "loongarch_vendor", 0x8);
