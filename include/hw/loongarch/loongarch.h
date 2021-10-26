@@ -41,6 +41,7 @@ typedef struct LoongarchMachineState {
     MachineState parent_obj;
 
     gipiState   *gipi;
+    qemu_irq    *pch_irq;
 } LoongarchMachineState;
 
 #define TYPE_LOONGARCH_MACHINE  MACHINE_TYPE_NAME("loongson7a")
