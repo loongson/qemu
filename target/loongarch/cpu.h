@@ -260,6 +260,94 @@ struct CPULoongArchState {
 #endif
 };
 
+#define CSR_OFF(X)  \
+           [LOONGARCH_CSR_##X] = offsetof(CPULoongArchState, CSR_##X)
+#define CSR_OFF_ARRAY(X, N)  \
+           [LOONGARCH_CSR_##X(N)] = offsetof(CPULoongArchState, CSR_##X[N])
+
+static const int csr_offsets[] = {
+     CSR_OFF(CRMD),
+     CSR_OFF(PRMD),
+     CSR_OFF(EUEN),
+     CSR_OFF(MISC),
+     CSR_OFF(ECFG),
+     CSR_OFF(ESTAT),
+     CSR_OFF(ERA),
+     CSR_OFF(BADV),
+     CSR_OFF(BADI),
+     CSR_OFF(EENTRY),
+     CSR_OFF(TLBIDX),
+     CSR_OFF(TLBEHI),
+     CSR_OFF(TLBELO0),
+     CSR_OFF(TLBELO1),
+     CSR_OFF(ASID),
+     CSR_OFF(PGDL),
+     CSR_OFF(PGDH),
+     CSR_OFF(PGD),
+     CSR_OFF(PWCL),
+     CSR_OFF(PWCH),
+     CSR_OFF(STLBPS),
+     CSR_OFF(RVACFG),
+     CSR_OFF(CPUID),
+     CSR_OFF(PRCFG1),
+     CSR_OFF(PRCFG2),
+     CSR_OFF(PRCFG3),
+     CSR_OFF_ARRAY(SAVE, 0),
+     CSR_OFF_ARRAY(SAVE, 1),
+     CSR_OFF_ARRAY(SAVE, 2),
+     CSR_OFF_ARRAY(SAVE, 3),
+     CSR_OFF_ARRAY(SAVE, 4),
+     CSR_OFF_ARRAY(SAVE, 5),
+     CSR_OFF_ARRAY(SAVE, 6),
+     CSR_OFF_ARRAY(SAVE, 7),
+     CSR_OFF_ARRAY(SAVE, 8),
+     CSR_OFF_ARRAY(SAVE, 9),
+     CSR_OFF_ARRAY(SAVE, 10),
+     CSR_OFF_ARRAY(SAVE, 11),
+     CSR_OFF_ARRAY(SAVE, 12),
+     CSR_OFF_ARRAY(SAVE, 13),
+     CSR_OFF_ARRAY(SAVE, 14),
+     CSR_OFF_ARRAY(SAVE, 15),
+     CSR_OFF(TID),
+     CSR_OFF(TCFG),
+     CSR_OFF(TVAL),
+     CSR_OFF(CNTC),
+     CSR_OFF(TICLR),
+     CSR_OFF(LLBCTL),
+     CSR_OFF(IMPCTL1),
+     CSR_OFF(IMPCTL2),
+     CSR_OFF(TLBRENTRY),
+     CSR_OFF(TLBRBADV),
+     CSR_OFF(TLBRERA),
+     CSR_OFF(TLBRSAVE),
+     CSR_OFF(TLBRELO0),
+     CSR_OFF(TLBRELO1),
+     CSR_OFF(TLBREHI),
+     CSR_OFF(TLBRPRMD),
+     CSR_OFF(MERRCTL),
+     CSR_OFF(MERRINFO1),
+     CSR_OFF(MERRINFO2),
+     CSR_OFF(MERRENTRY),
+     CSR_OFF(MERRERA),
+     CSR_OFF(MERRSAVE),
+     CSR_OFF(CTAG),
+     CSR_OFF_ARRAY(DMW, 0),
+     CSR_OFF_ARRAY(DMW, 1),
+     CSR_OFF_ARRAY(DMW, 2),
+     CSR_OFF_ARRAY(DMW, 3),
+     CSR_OFF(DBG),
+     CSR_OFF(DERA),
+     CSR_OFF(DSAVE),
+};
+
+static inline int cpu_csr_offset(unsigned csr_num)
+{
+    if (csr_num < ARRAY_SIZE(csr_offsets)) {
+        return csr_offsets[csr_num];
+    }
+    return 0;
+}
+
 /**
  * LoongArchCPU:
  * @env: #CPULoongArchState

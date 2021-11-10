@@ -92,3 +92,10 @@ DEF_HELPER_2(frint_s, i64, env, i64)
 DEF_HELPER_2(frint_d, i64, env, i64)
 
 DEF_HELPER_FLAGS_2(set_rounding_mode, TCG_CALL_NO_RWG, void, env, i32)
+
+/*Core functions */
+#ifndef CONFIG_USER_ONLY
+DEF_HELPER_2(csr_rdq, i64, env, i64)
+DEF_HELPER_3(csr_wrq, i64, env, tl, i64)
+DEF_HELPER_4(csr_xchgq, i64, env, tl, tl, i64)
+#endif /* !CONFIG_USER_ONLY */
