@@ -15,6 +15,10 @@
 #include "sysemu/runstate.h"
 #include "sysemu/reset.h"
 #include "hw/loongarch/loongarch.h"
+#include "hw/intc/loongarch_ipi.h"
+#include "hw/intc/loongarch_extioi.h"
+#include "hw/intc/loongarch_pch_pic.h"
+#include "hw/intc/loongarch_pch_msi.h"
 #include "hw/pci-host/ls7a.h"
 
 
@@ -69,6 +73,83 @@ static const MemoryRegionOps loongarch_qemu_ops = {
         .max_access_size = 8,
     },
 };
+
+static void sysbus_mmio_map_loongarch(SysBusDevice *dev, int n,
+                                      hwaddr addr, MemoryRegion *iocsr)
+{
+    assert(n >= 0 && n < dev->num_mmio);
+
+    if (dev->mmio[n].addr == addr) {
+        /* ??? region already mapped here. */
+        return;
+    }
+    if (dev->mmio[n].addr != (hwaddr)-1) {
+        /* Unregister previous mapping. */
+        memory_region_del_subregion(iocsr, dev->mmio[n].memory);
+    }
+    dev->mmio[n].addr = addr;
+    memory_region_add_subregion(iocsr, addr, dev->mmio[n].memory);
+}
+
+static void loongson3_irq_init(MachineState *machine)
+{
+    LoongArchMachineState *lams = LOONGARCH_MACHINE(machine);
+    DeviceState *ipi, *extioi, *pch_pic, *pch_msi, *cpudev;
+    SysBusDevice *d;
+    int cpu, pin, i;
+    unsigned long ipi_addr;
+
+    ipi = qdev_new(TYPE_LOONGARCH_IPI);
+    d = SYS_BUS_DEVICE(ipi);
+    sysbus_realize_and_unref(d, &error_fatal);
+    for (cpu = 0; cpu < machine->smp.cpus; cpu++) {
+        cpudev = DEVICE(qemu_get_cpu(cpu));
+        ipi_addr = SMP_IPI_MAILBOX + cpu * 0x100;
+        sysbus_mmio_map_loongarch(d, cpu, ipi_addr, &lams->system_iocsr);
+        qdev_connect_gpio_out(ipi, cpu, qdev_get_gpio_in(cpudev, IRQ_IPI));
+    }
+
+    extioi = qdev_new(TYPE_LOONGARCH_EXTIOI);
+    d = SYS_BUS_DEVICE(extioi);
+    sysbus_realize_and_unref(d, &error_fatal);
+    sysbus_mmio_map_loongarch(d, 0, APIC_BASE, &lams->system_iocsr);
+
+    for (i = 0; i < EXTIOI_IRQS; i++) {
+        sysbus_connect_irq(d, i, qdev_get_gpio_in(extioi, i));
+    }
+
+    /*
+     * connect ext irq to the cpu irq
+     * cpu_pin[9:2] <= intc_pin[7:0]
+     */
+    for (cpu = 0; cpu < machine->smp.cpus; cpu++) {
+        cpudev = DEVICE(qemu_get_cpu(cpu));
+        for (pin = 0; pin < LS3A_INTC_IP; pin++) {
+            qdev_connect_gpio_out(extioi, (cpu * 8 + pin),
+                                  qdev_get_gpio_in(cpudev, pin + 2));
+        }
+    }
+
+    pch_pic = qdev_new(TYPE_LOONGARCH_PCH_PIC);
+    d = SYS_BUS_DEVICE(pch_pic);
+    sysbus_realize_and_unref(d, &error_fatal);
+    sysbus_mmio_map(d, 0, LS7A_IOAPIC_REG_BASE);
+
+    /* Connect 64 pch_pic irqs to extioi */
+    for (int i = 0; i < PCH_PIC_IRQ_NUM; i++) {
+        sysbus_connect_irq(d, i, qdev_get_gpio_in(extioi, i));
+    }
+
+    pch_msi = qdev_new(TYPE_LOONGARCH_PCH_MSI);
+    d = SYS_BUS_DEVICE(pch_msi);
+    sysbus_realize_and_unref(d, &error_fatal);
+    sysbus_mmio_map(d, 0, LS7A_PCH_MSI_ADDR_LOW);
+    for (i = 0; i < PCH_MSI_IRQ_NUM; i++) {
+        /* Connect 192 pch_msi irqs to extioi */
+        sysbus_connect_irq(d, i,
+                           qdev_get_gpio_in(extioi, i + PCH_MSI_IRQ_START));
+    }
+}
 
 static void loongson3_init(MachineState *machine)
 {
@@ -125,6 +206,9 @@ static void loongson3_init(MachineState *machine)
                              machine->ram, offset, highram_size);
     memory_region_add_subregion(address_space_mem, 0x90000000, &lams->highmem);
     offset += highram_size;
+
+    /* Initialize the IO interrupt subsystem */
+    loongson3_irq_init(machine);
 
     LOONGARCH_SIMPLE_MMIO_OPS(FEATURE_REG, "loongarch_feature", 0x8);
     LOONGARCH_SIMPLE_MMIO_OPS(VENDOR_REG, "loongarch_vendor", 0x8);

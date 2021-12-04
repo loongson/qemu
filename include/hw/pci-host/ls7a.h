@@ -24,6 +24,19 @@
 #define LS7A_PCI_IO_BASE         0x18000000UL
 #define LS7A_PCI_IO_SIZE         0x00010000
 
+#define LS7A_PCH_REG_BASE       0x10000000UL
+#define LS7A_IOAPIC_REG_BASE    (LS7A_PCH_REG_BASE)
+#define LS7A_PCH_MSI_ADDR_LOW   0x2FF00000UL
+
+/*
+ * According to the kernel pch irq start from 64 offset
+ * 0 ~ 16 irqs used for non-pci device while 16 ~ 64 irqs
+ * used for pci device.
+ */
+#define PCH_PIC_IRQ_OFFSET      64
+#define LS7A_DEVICE_IRQS        16
+#define LS7A_PCI_IRQS           48
+
 struct LS7APCIState {
     /*< private >*/
     PCIDevice parent_obj;
