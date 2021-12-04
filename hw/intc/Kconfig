@@ -76,3 +76,7 @@ config M68K_IRQC
 
 config LOONGARCH_IPI
     bool
+
+config LOONGARCH_PCH_PIC
+    bool
+    select UNIMP
