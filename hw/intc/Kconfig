@@ -73,3 +73,6 @@ config GOLDFISH_PIC
 
 config M68K_IRQC
     bool
+
+config LOONGARCH_IPI
+    bool
