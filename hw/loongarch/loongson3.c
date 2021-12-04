@@ -144,6 +144,9 @@ static PCIBus *loongson3_irq_init(MachineState *machine)
                    qdev_get_gpio_in(pch_pic, LS7A_UART_IRQ - PCH_PIC_IRQ_OFFSET),
                    115200, serial_hd(0), DEVICE_LITTLE_ENDIAN);
 
+    sysbus_create_simple("ls7a_rtc", LS7A_RTC_REG_BASE,
+                         qdev_get_gpio_in(pch_pic, LS7A_RTC_IRQ - PCH_PIC_IRQ_OFFSET));
+
     /* Connect 64 pch_pic irqs to extioi */
     for (int i = 0; i < PCH_PIC_IRQ_NUM; i++) {
         sysbus_connect_irq(d, i, qdev_get_gpio_in(extioi, i));
