@@ -3,3 +3,4 @@ config LOONGSON3_LS7A
     select PCI_EXPRESS_7A
     select LOONGARCH_IPI
     select LOONGARCH_PCH_PIC
+    select LOONGARCH_PCH_MSI

@@ -255,3 +255,6 @@ loongarch_ipi_write(unsigned size, uint32_t addr, unsigned long val) "size: %u a
 pch_pic_irq_handler(uint32_t edge, int irq, int level) "edge 0x%02x irq %d level %d"
 loongarch_pch_pic_read(unsigned size, uint32_t addr, unsigned long val) "size: %u addr: 0x%"PRIx32 "val: 0x%" PRIx64
 loongarch_pch_pic_write(unsigned size, uint32_t addr, unsigned long val) "size: %u addr: 0x%"PRIx32 "val: 0x%" PRIx64
+
+# loongarch_pch_msi.c
+loongarch_msi_set_irq(int irq_num) "set msi irq %d"
