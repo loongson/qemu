@@ -8,6 +8,20 @@
 #include "qemu/osdep.h"
 #include "cpu.h"
 #include "migration/cpu.h"
+#include "internals.h"
+
+/* TLB state */
+const VMStateDescription vmstate_tlb = {
+    .name = "cpu/tlb",
+    .version_id = 0,
+    .minimum_version_id = 0,
+    .fields = (VMStateField[]) {
+        VMSTATE_UINT64(tlb_misc, loongarch_tlb),
+        VMSTATE_UINT64(tlb_entry0, loongarch_tlb),
+        VMSTATE_UINT64(tlb_entry1, loongarch_tlb),
+        VMSTATE_END_OF_LIST()
+    }
+};
 
 /* LoongArch CPU state */
 
@@ -21,6 +35,10 @@ const VMStateDescription vmstate_loongarch_cpu = {
         VMSTATE_UINTTL(env.pc, LoongArchCPU),
         VMSTATE_UINT64_ARRAY(env.fpr, LoongArchCPU, 32),
         VMSTATE_UINT32(env.fcsr0, LoongArchCPU),
+
+        /* TLB */
+        VMSTATE_UINT32(env.stlb_size, LoongArchCPU),
+        VMSTATE_UINT32(env.mtlb_size, LoongArchCPU),
 
         /* Remaining CSR registers */
         VMSTATE_UINT64(env.CSR_CRMD, LoongArchCPU),
@@ -78,6 +96,8 @@ const VMStateDescription vmstate_loongarch_cpu = {
         VMSTATE_UINT64(env.CSR_DBG, LoongArchCPU),
         VMSTATE_UINT64(env.CSR_DERA, LoongArchCPU),
         VMSTATE_UINT64(env.CSR_DSAVE, LoongArchCPU),
+        VMSTATE_STRUCT_ARRAY(env.tlb, LoongArchCPU, LOONGARCH_TLB_MAX,
+                             0, vmstate_tlb, loongarch_tlb),
 
         VMSTATE_END_OF_LIST()
     },

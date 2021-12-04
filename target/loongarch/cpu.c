@@ -237,6 +237,7 @@ static void loongarch_cpu_realizefn(DeviceState *dev, Error **errp)
 
 #ifndef CONFIG_USER_ONLY
     LoongArchCPU *cpu = LOONGARCH_CPU(dev);
+    CPULoongArchState *env = &cpu->env;
 #endif
 
     cpu_exec_realizefn(cs, &local_err);
@@ -248,6 +249,7 @@ static void loongarch_cpu_realizefn(DeviceState *dev, Error **errp)
 #ifndef CONFIG_USER_ONLY
     timer_init_ns(&cpu->timer, QEMU_CLOCK_VIRTUAL,
                   &loongarch_stable_timer_cb, cpu);
+    loongarch_mmu_init(env);
 #endif
 
     cpu_reset(cs);
@@ -295,6 +297,23 @@ void loongarch_cpu_dump_state(CPUState *cs, FILE *f, int flags)
         }
     }
 
+#ifndef CONFIG_USER_ONLY
+    qemu_fprintf(f, "EUEN=%016" PRIx64 "\n", env->CSR_EUEN);
+    qemu_fprintf(f, "ESTAT=%016" PRIx64 "\n", env->CSR_ESTAT);
+    qemu_fprintf(f, "ERA=%016" PRIx64 "\n", env->CSR_ERA);
+    qemu_fprintf(f, "CRMD=%016" PRIx64 "\n", env->CSR_CRMD);
+    qemu_fprintf(f, "PRMD=%016" PRIx64 "\n", env->CSR_PRMD);
+    qemu_fprintf(f, "BadVAddr=%016" PRIx64 "\n", env->CSR_BADV);
+    qemu_fprintf(f, "EENTRY=%016" PRIx64 "\n", env->CSR_EENTRY);
+    qemu_fprintf(f, "TLBRERA=%016" PRIx64 "\n", env->CSR_TLBRERA);
+    qemu_fprintf(f, "TLBRBADV=%016" PRIx64 "\n", env->CSR_TLBRBADV);
+    qemu_fprintf(f, "TLBRENTRY=%016" PRIx64 "\n", env->CSR_TLBRENTRY);
+    qemu_fprintf(f, "BadInstr=%016" PRIx64 "\n", env->CSR_BADI);
+    qemu_fprintf(f, "PRCFG1=%016" PRIx64 ", PRCFG2=%016" PRIx64 ","
+                 " PRCFG3=%016" PRIx64 "\n",
+                 env->CSR_PRCFG1, env->CSR_PRCFG3, env->CSR_PRCFG3);
+#endif
+
     /* fpr */
     if (flags & CPU_DUMP_FPU) {
         for (i = 0; i < 32; i++) {
@@ -312,8 +331,20 @@ void loongarch_cpu_dump_state(CPUState *cs, FILE *f, int flags)
 static struct TCGCPUOps loongarch_tcg_ops = {
     .initialize = loongarch_translate_init,
     .synchronize_from_tb = loongarch_cpu_synchronize_from_tb,
+
+#if !defined(CONFIG_USER_ONLY)
+    .tlb_fill = loongarch_cpu_tlb_fill,
+#endif /* !CONFIG_USER_ONLY */
 };
 #endif /* CONFIG_TCG */
+
+#ifndef CONFIG_USER_ONLY
+#include "hw/core/sysemu-cpu-ops.h"
+
+static const struct SysemuCPUOps loongarch_sysemu_ops = {
+    .get_phys_page_debug = loongarch_cpu_get_phys_page_debug,
+};
+#endif
 
 static void loongarch_cpu_class_init(ObjectClass *c, void *data)
 {
@@ -331,6 +362,7 @@ static void loongarch_cpu_class_init(ObjectClass *c, void *data)
     cc->set_pc = loongarch_cpu_set_pc;
 #ifndef CONFIG_USER_ONLY
     dc->vmsd = &vmstate_loongarch_cpu;
+    cc->sysemu_ops = &loongarch_sysemu_ops;
 #endif
     cc->disas_set_info = loongarch_cpu_disas_set_info;
 #ifdef CONFIG_TCG

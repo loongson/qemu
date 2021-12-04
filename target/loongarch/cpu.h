@@ -152,6 +152,27 @@ extern const char * const fregnames[32];
 #define N_IRQS      14
 #define IRQ_TIMER   11
 
+#define LOONGARCH_TLB_MAX      (2048 + 64) /* 2048 STLB + 64 MTLB */
+
+/*
+ * define the ASID PS E VPPN field of TLB
+ *
+ * PS of stlb come from stlbps.ps
+ * PS of mtlb come from tlbidx.ps
+ */
+FIELD(TLB_MISC, E, 0, 1)
+FIELD(TLB_MISC, ASID, 1, 10)
+FIELD(TLB_MISC, VPPN, 13, 35)
+FIELD(TLB_MISC, PS, 48, 6)
+
+struct loongarch_tlb {
+    uint64_t tlb_misc;
+    /* Fields corresponding to CSR_TLBELO0/1 */
+    uint64_t tlb_entry0;
+    uint64_t tlb_entry1;
+};
+typedef struct loongarch_tlb loongarch_tlb;
+
 typedef struct CPULoongArchState CPULoongArchState;
 struct CPULoongArchState {
     uint64_t gpr[32];
@@ -231,6 +252,12 @@ struct CPULoongArchState {
     uint64_t CSR_DBG;
     uint64_t CSR_DERA;
     uint64_t CSR_DSAVE;
+
+#ifndef CONFIG_USER_ONLY
+    uint32_t      stlb_size; /* at most : 8 * 256 = 2048 */
+    uint32_t      mtlb_size; /* at most : 64 */
+    loongarch_tlb tlb[LOONGARCH_TLB_MAX];
+#endif
 };
 
 /**
@@ -270,11 +297,27 @@ struct LoongArchCPUClass {
     DeviceReset parent_reset;
 };
 
-#define MMU_USER_IDX 3
+/*
+ * LoongArch cpu has 4 priv level.
+ * 0 for kernel mode, 3 for user mode.
+ * Define a extra index for Direct mode.
+ */
+#define MMU_KERNEL_IDX 0 /* kernel mode idx */
+#define MMU_USER_IDX   3 /* user mode idx */
+#define MMU_DA_IDX     4 /* DA mode idx */
 
 static inline int cpu_mmu_index(CPULoongArchState *env, bool ifetch)
 {
+#ifdef CONFIG_USER_ONLY
     return MMU_USER_IDX;
+#else
+    uint8_t pg = FIELD_EX64(env->CSR_CRMD, CSR_CRMD, PG);
+
+    if (!pg) {
+        return MMU_DA_IDX;
+    }
+    return FIELD_EX64(env->CSR_CRMD, CSR_CRMD, PLV);
+#endif
 }
 
 static inline void cpu_get_tb_cpu_state(CPULoongArchState *env,
