@@ -1,0 +1,3 @@
+config LOONGSON3_LS7A
+    bool
+    select PCI_EXPRESS_7A
