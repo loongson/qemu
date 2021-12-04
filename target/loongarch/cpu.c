@@ -146,11 +146,18 @@ static void loongarch_cpu_do_interrupt(CPUState *cs)
                      " TLBRERA " TARGET_FMT_lx " %s exception\n", __func__,
                      env->pc, env->CSR_ERA, env->CSR_TLBRERA, name);
     }
+    if (cs->exception_index == EXCCODE_INT &&
+       (FIELD_EX64(env->CSR_DBG, CSR_DBG, DST))) {
+        env->CSR_DBG = FIELD_DP64(env->CSR_DBG, CSR_DBG, DEI, 1);
+        goto set_DERA;
+    }
 
     switch (cs->exception_index) {
     case EXCCODE_DBP:
         env->CSR_DBG = FIELD_DP64(env->CSR_DBG, CSR_DBG, DCL, 1);
         env->CSR_DBG = FIELD_DP64(env->CSR_DBG, CSR_DBG, ECODE, 0xC);
+        goto set_DERA;
+    set_DERA:
         env->CSR_DERA = env->pc;
         env->CSR_DBG = FIELD_DP64(env->CSR_DBG, CSR_DBG, DST, 1);
         env->pc = env->CSR_EENTRY + 0x480;

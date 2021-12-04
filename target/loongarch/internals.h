@@ -43,5 +43,15 @@ bool loongarch_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
 void loongarch_mmu_init(CPULoongArchState *env);
 hwaddr loongarch_cpu_get_phys_page_debug(CPUState *cpu, vaddr addr);
 #endif
+int loongarch_cpu_gdb_read_register(CPUState *cs, GByteArray *mem_buf, int n);
+int loongarch_cpu_gdb_write_register(CPUState *cs, uint8_t *mem_buf, int n);
+int loongarch_read_qxfer(CPUState *cs, const char *annex,
+                         uint8_t *read_buf,
+                         unsigned long offset, unsigned long len);
+int loongarch_write_qxfer(CPUState *cs, const char *annex,
+                          const uint8_t *write_buf,
+                          unsigned long offset, unsigned long len);
+
+void loongarch_cpu_register_gdb_regs_for_features(CPUState *cs);
 
 #endif
