@@ -28,6 +28,8 @@
 #include "hw/misc/unimp.h"
 #include "hw/loongarch/fw_cfg.h"
 #include "hw/firmware/smbios.h"
+#include "hw/acpi/aml-build.h"
+#include "qapi/qapi-visit-common.h"
 
 #define LOONGSON3_BIOSNAME "loongarch_bios.bin"
 
@@ -134,6 +136,7 @@ void loongarch_machine_done(Notifier *notifier, void *data)
 {
     LoongArchMachineState *lams = container_of(notifier,
                                         LoongArchMachineState, machine_done);
+    loongarch_acpi_setup(lams);
     loongarch_build_smbios(lams);
 }
 
@@ -211,6 +214,8 @@ static PCIBus *loongson3_irq_init(MachineState *machine)
     LoongArchMachineState *lams = LOONGARCH_MACHINE(machine);
     DeviceState *ipi, *extioi, *pch_pic, *pch_msi, *cpudev, *pciehost;
     SysBusDevice *d;
+    LS7APCIState *ls7a_pci;
+    PCIDevice *pci_dev;
     PCIBus *pci_bus;
     int cpu, pin, i;
     unsigned long ipi_addr;
@@ -283,6 +288,10 @@ static PCIBus *loongson3_irq_init(MachineState *machine)
         qdev_connect_gpio_out(pciehost, i,
                               qdev_get_gpio_in(extioi, i + LS7A_DEVICE_IRQS));
     }
+
+    pci_dev = PCI_DEVICE(qdev_new(TYPE_LS7A_PCIE));
+    ls7a_pci = LS7A_PCIE(pci_dev);
+    ls7a_pm_init(pci_dev, &ls7a_pci->pm, pch_pic);
 
     return pci_bus;
 }
@@ -429,6 +438,40 @@ static void loongson3_init(MachineState *machine)
     LOONGARCH_SIMPLE_MMIO_OPS(CPUNAME_REG, "loongarch_cpuname", 0x8);
 }
 
+bool loongarch_is_acpi_enabled(LoongArchMachineState *lams)
+{
+    if (lams->acpi == ON_OFF_AUTO_OFF) {
+        return false;
+    }
+    return true;
+}
+
+static void loongarch_get_acpi(Object *obj, Visitor *v, const char *name,
+                               void *opaque, Error **errp)
+{
+    LoongArchMachineState *lams = LOONGARCH_MACHINE(obj);
+    OnOffAuto acpi = lams->acpi;
+
+    visit_type_OnOffAuto(v, name, &acpi, errp);
+}
+
+static void loongarch_set_acpi(Object *obj, Visitor *v, const char *name,
+                               void *opaque, Error **errp)
+{
+    LoongArchMachineState *lams = LOONGARCH_MACHINE(obj);
+
+    visit_type_OnOffAuto(v, name, &lams->acpi, errp);
+}
+
+static void loongarch_machine_initfn(Object *obj)
+{
+    LoongArchMachineState *lams = LOONGARCH_MACHINE(obj);
+
+    lams->acpi = ON_OFF_AUTO_AUTO;
+    lams->oem_id = g_strndup(ACPI_BUILD_APPNAME6, 6);
+    lams->oem_table_id = g_strndup(ACPI_BUILD_APPNAME8, 8);
+}
+
 static void loongarch_class_init(ObjectClass *oc, void *data)
 {
     MachineClass *mc = MACHINE_CLASS(oc);
@@ -445,6 +488,12 @@ static void loongarch_class_init(ObjectClass *oc, void *data)
     mc->block_default_type = IF_VIRTIO;
     mc->default_boot_order = "c";
     mc->no_cdrom = 1;
+
+    object_class_property_add(oc, "acpi", "OnOffAuto",
+        loongarch_get_acpi, loongarch_set_acpi,
+        NULL, NULL);
+    object_class_property_set_description(oc, "acpi",
+        "Enable ACPI");
 }
 
 static const TypeInfo loongarch_machine_types[] = {
@@ -452,6 +501,7 @@ static const TypeInfo loongarch_machine_types[] = {
         .name           = TYPE_LOONGARCH_MACHINE,
         .parent         = TYPE_MACHINE,
         .instance_size  = sizeof(LoongArchMachineState),
+        .instance_init = loongarch_machine_initfn,
         .class_init     = loongarch_class_init,
     }
 };

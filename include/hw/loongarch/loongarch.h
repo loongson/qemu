@@ -54,9 +54,15 @@ typedef struct LoongArchMachineState {
     /* State for other subsystems/APIs: */
     Notifier machine_done;
     FWCfgState  *fw_cfg;
+    OnOffAuto   acpi;
+    char        *oem_id;
+    char        *oem_table_id;
 } LoongArchMachineState;
 
 #define TYPE_LOONGARCH_MACHINE  MACHINE_TYPE_NAME("loongson3-ls7a")
 DECLARE_INSTANCE_CHECKER(LoongArchMachineState, LOONGARCH_MACHINE,
                          TYPE_LOONGARCH_MACHINE)
+
+bool loongarch_is_acpi_enabled(LoongArchMachineState *lams);
+void loongarch_acpi_setup(LoongArchMachineState *lams);
 #endif
