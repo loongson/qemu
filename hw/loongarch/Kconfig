@@ -13,3 +13,7 @@ config LOONGSON3_LS7A
     select LOONGARCH_PCH_MSI
     select LOONGARCH_EXTIOI
     select LS7A_RTC
+    select FW_CFG_LOONGARCH
+
+config FW_CFG_LOONGARCH
+    bool

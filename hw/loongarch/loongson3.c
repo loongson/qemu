@@ -13,6 +13,8 @@
 #include "hw/char/serial.h"
 #include "sysemu/sysemu.h"
 #include "sysemu/qtest.h"
+#include "hw/loader.h"
+#include "elf.h"
 #include "hw/irq.h"
 #include "net/net.h"
 #include "sysemu/runstate.h"
@@ -24,6 +26,9 @@
 #include "hw/intc/loongarch_pch_msi.h"
 #include "hw/pci-host/ls7a.h"
 #include "hw/misc/unimp.h"
+#include "hw/loongarch/fw_cfg.h"
+
+#define LOONGSON3_BIOSNAME "loongarch_bios.bin"
 
 
 static void loongarch_cpu_reset(void *opaque)
@@ -203,6 +208,8 @@ static void loongson3_init(MachineState *machine)
     LoongArchMachineState *lams = LOONGARCH_MACHINE(machine);
     int i;
     PCIBus *pci_bus = NULL;
+    int bios_size;
+    char *filename;
 
     if (!cpu_model) {
         cpu_model = LOONGARCH_CPU_TYPE_NAME("Loongson-3A5000");
@@ -238,6 +245,11 @@ static void loongson3_init(MachineState *machine)
         qemu_register_reset(loongarch_cpu_reset, cpu);
     }
 
+    if (ram_size < 1 * GiB) {
+        error_report("ram_size must be greater than 1G due to the bios memory layout");
+        exit(1);
+    }
+
     memory_region_init_alias(&lams->lowmem, NULL, "loongarch.lowram",
                              machine->ram, 0, 256 * MiB);
     memory_region_add_subregion(address_space_mem, offset, &lams->lowmem);
@@ -249,6 +261,28 @@ static void loongson3_init(MachineState *machine)
     memory_region_add_subregion(address_space_mem, 0x90000000, &lams->highmem);
     offset += highram_size;
 
+    /* load the BIOS image. */
+    filename = qemu_find_file(QEMU_FILE_TYPE_BIOS,
+                              machine->firmware ?: LOONGSON3_BIOSNAME);
+    if (filename) {
+        bios_size = load_image_targphys(filename, LA_BIOS_BASE, LA_BIOS_SIZE);
+        lams->fw_cfg = loongarch_fw_cfg_init(ram_size, machine);
+        rom_set_fw(lams->fw_cfg);
+        g_free(filename);
+    } else {
+        bios_size = -1;
+    }
+
+    if ((bios_size < 0 || bios_size > LA_BIOS_SIZE) && !qtest_enabled()) {
+        error_report("Could not load LOONGARCH bios '%s'", machine->firmware);
+        exit(1);
+    }
+
+
+    memory_region_init_ram(&lams->bios, NULL, "loongarch.bios",
+                           LA_BIOS_SIZE, &error_fatal);
+    memory_region_set_readonly(&lams->bios, true);
+    memory_region_add_subregion(get_system_memory(), LA_BIOS_BASE, &lams->bios);
     /*
      * There are some invalid guest memory access.
      * Create some unimplemented devices to emulate this.
@@ -286,6 +320,7 @@ static void loongarch_class_init(ObjectClass *oc, void *data)
     mc->default_ram_id = "loongarch.ram";
     mc->max_cpus = LOONGARCH_MAX_VCPUS;
     mc->is_default = 1;
+    mc->default_machine_opts = "firmware=loongarch_bios.bin";
     mc->default_kernel_irqchip_split = false;
     mc->block_default_type = IF_VIRTIO;
     mc->default_boot_order = "c";
