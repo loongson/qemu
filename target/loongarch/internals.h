@@ -25,4 +25,8 @@ const char *loongarch_exception_name(int32_t exception);
 
 void restore_fp_status(CPULoongArchState *env);
 
+#ifndef CONFIG_USER_ONLY
+extern const VMStateDescription vmstate_loongarch_cpu;
+#endif
+
 #endif
