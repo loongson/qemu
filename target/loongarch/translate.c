@@ -185,7 +185,7 @@ static void loongarch_tr_translate_insn(DisasContextBase *dcbase, CPUState *cs)
     if (!decode(ctx, ctx->opcode)) {
         qemu_log_mask(LOG_UNIMP, "Error: unkown opcode. 0x%lx: 0x%x\n",
                       ctx->base.pc_next, ctx->opcode);
-        generate_exception(ctx, EXCP_INE);
+        generate_exception(ctx, EXCCODE_INE);
     }
 
     for (int i = ctx->ntemp - 1; i >= 0; --i) {

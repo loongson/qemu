@@ -28,7 +28,7 @@ void cpu_loop(CPULoongArchState *env)
         case EXCP_INTERRUPT:
             /* just indicate that signals should be handled asap */
             break;
-        case EXCP_SYSCALL:
+        case EXCCODE_SYS:
             env->pc += 4;
             ret = do_syscall(env, env->gpr[11],
                              env->gpr[4], env->gpr[5],
@@ -48,10 +48,10 @@ void cpu_loop(CPULoongArchState *env)
             }
             env->gpr[4] = ret;
             break;
-        case EXCP_INE:
+        case EXCCODE_INE:
             force_sig_fault(TARGET_SIGILL, 0, env->pc);
             break;
-        case EXCP_FPE:
+        case EXCCODE_FPE:
             si_code = TARGET_FPE_FLTUNK;
             if (GET_FP_CAUSE(env->fcsr0) & FP_INVALID) {
                 si_code = TARGET_FPE_FLTINV;
@@ -67,7 +67,7 @@ void cpu_loop(CPULoongArchState *env)
             force_sig_fault(TARGET_SIGFPE, si_code, env->pc);
             break;
         case EXCP_DEBUG:
-        case EXCP_BREAK:
+        case EXCCODE_BRK:
             force_sig_fault(TARGET_SIGTRAP, TARGET_TRAP_BRKPT, env->pc);
             break;
         case EXCP_ATOMIC:

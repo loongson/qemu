@@ -5,13 +5,13 @@
 
 static bool trans_break(DisasContext *ctx, arg_break *a)
 {
-    generate_exception(ctx, EXCP_BREAK);
+    generate_exception(ctx, EXCCODE_BRK);
     return true;
 }
 
 static bool trans_syscall(DisasContext *ctx, arg_syscall *a)
 {
-    generate_exception(ctx, EXCP_SYSCALL);
+    generate_exception(ctx, EXCCODE_SYS);
     return true;
 }
 

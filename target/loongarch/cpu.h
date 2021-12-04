@@ -427,17 +427,6 @@ typedef LoongArchCPU ArchCPU;
 
 #include "exec/cpu-all.h"
 
-/* Exceptions */
-enum {
-    EXCP_NONE          = -1,
-    EXCP_SYSCALL       = 0,
-    EXCP_BREAK,
-    EXCP_INE,
-    EXCP_FPE,
-
-    EXCP_LAST = EXCP_FPE,
-};
-
 #define CPU_INTERRUPT_WAKE CPU_INTERRUPT_TGT_INT_0
 
 #define LOONGARCH_CPU_TYPE_SUFFIX "-" TYPE_LOONGARCH_CPU
