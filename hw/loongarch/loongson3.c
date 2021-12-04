@@ -27,6 +27,7 @@
 #include "hw/pci-host/ls7a.h"
 #include "hw/misc/unimp.h"
 #include "hw/loongarch/fw_cfg.h"
+#include "hw/firmware/smbios.h"
 
 #define LOONGSON3_BIOSNAME "loongarch_bios.bin"
 
@@ -98,6 +99,42 @@ static void fw_cfg_add_kernel_info(FWCfgState *fw_cfg)
 
     fw_cfg_add_i32(fw_cfg, FW_CFG_CMDLINE_SIZE, ret);
     fw_cfg_add_string(fw_cfg, FW_CFG_CMDLINE_DATA, (const char *)cmdline_buf);
+}
+
+static void loongarch_build_smbios(LoongArchMachineState *lams)
+{
+    MachineState *ms = MACHINE(lams);
+    MachineClass *mc = MACHINE_GET_CLASS(lams);
+    uint8_t *smbios_tables, *smbios_anchor;
+    size_t smbios_tables_len, smbios_anchor_len;
+    const char *product = "QEMU Virtual Machine";
+
+    if (!lams->fw_cfg) {
+        return;
+    }
+
+    product = "Loongson-3A5000-7A1000-TCG";
+
+    smbios_set_defaults("QEMU", product, mc->name, false,
+                        true, SMBIOS_ENTRY_POINT_30);
+
+    smbios_get_tables(ms, NULL, 0, &smbios_tables, &smbios_tables_len,
+                      &smbios_anchor, &smbios_anchor_len, &error_fatal);
+
+    if (smbios_anchor) {
+        fw_cfg_add_file(lams->fw_cfg, "etc/smbios/smbios-tables",
+                        smbios_tables, smbios_tables_len);
+        fw_cfg_add_file(lams->fw_cfg, "etc/smbios/smbios-anchor",
+                        smbios_anchor, smbios_anchor_len);
+    }
+}
+
+static
+void loongarch_machine_done(Notifier *notifier, void *data)
+{
+    LoongArchMachineState *lams = container_of(notifier,
+                                        LoongArchMachineState, machine_done);
+    loongarch_build_smbios(lams);
 }
 
 static void loongarch_cpu_reset(void *opaque)
@@ -362,6 +399,10 @@ static void loongson3_init(MachineState *machine)
                            LA_BIOS_SIZE, &error_fatal);
     memory_region_set_readonly(&lams->bios, true);
     memory_region_add_subregion(get_system_memory(), LA_BIOS_BASE, &lams->bios);
+
+    lams->machine_done.notify = loongarch_machine_done;
+    qemu_add_machine_init_done_notifier(&lams->machine_done);
+
     /*
      * There are some invalid guest memory access.
      * Create some unimplemented devices to emulate this.
