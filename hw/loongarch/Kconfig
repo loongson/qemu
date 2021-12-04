@@ -1,5 +1,12 @@
 config LOONGSON3_LS7A
     bool
+    imply VGA_PCI
+    imply VIRTIO_VGA
+    imply PCI_DEVICES
+    select ISA_BUS
+    select SERIAL
+    select SERIAL_ISA
+    select VIRTIO_PCI
     select PCI_EXPRESS_7A
     select LOONGARCH_IPI
     select LOONGARCH_PCH_PIC

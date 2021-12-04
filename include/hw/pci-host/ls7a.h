@@ -37,6 +37,9 @@
 #define LS7A_DEVICE_IRQS        16
 #define LS7A_PCI_IRQS           48
 
+#define LS7A_UART_IRQ           (PCH_PIC_IRQ_OFFSET + 2)
+#define LS7A_UART_BASE          0x1fe001e0
+
 struct LS7APCIState {
     /*< private >*/
     PCIDevice parent_obj;
@@ -51,6 +54,7 @@ typedef struct LS7APCIEHost {
 
     LS7APCIState pci_dev;
 
+    qemu_irq irqs[LS7A_PCI_IRQS];
     MemoryRegion pci_conf;
     MemoryRegion pci_io;
 } LS7APCIEHost;

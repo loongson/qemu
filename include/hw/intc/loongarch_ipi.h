@@ -8,6 +8,8 @@
 #ifndef HW_LOONGARCH_IPI_H
 #define HW_LOONGARCH_IPI_H
 
+#include "hw/sysbus.h"
+
 /* Mainy used by iocsr read and write */
 #define SMP_IPI_MAILBOX      0x1000ULL
 #define CORE_STATUS_OFF       0x0
