@@ -11,6 +11,7 @@
 #include "hw/pci/pci.h"
 #include "hw/pci/pcie_host.h"
 #include "hw/pci-host/pam.h"
+#include "hw/acpi/ls7a.h"
 #include "qemu/units.h"
 #include "qemu/range.h"
 #include "qom/object.h"
@@ -20,6 +21,9 @@
 #define LS_PCIECFG_SIZE         0x08000000
 #define LS7A_PCI_IO_BASE        0x18004000UL
 #define LS7A_PCI_IO_SIZE        0xC000
+
+#define LS7A_PCI_MEM_BASE        0x40000000UL
+#define LS7A_PCI_MEM_SIZE        0x40000000UL
 
 #define LS7A_PCH_REG_BASE       0x10000000UL
 #define LS7A_IOAPIC_REG_BASE    (LS7A_PCH_REG_BASE)
@@ -39,4 +43,6 @@
 #define LS7A_MISC_REG_BASE      (LS7A_PCH_REG_BASE + 0x00080000)
 #define LS7A_RTC_REG_BASE       (LS7A_MISC_REG_BASE + 0x00050100)
 #define LS7A_RTC_LEN            0x100
+#define LS7A_ACPI_REG_BASE      (LS7A_MISC_REG_BASE + 0x00050000)
+#define LS7A_SCI_IRQ            (PCH_PIC_IRQ_OFFSET + 4)
 #endif

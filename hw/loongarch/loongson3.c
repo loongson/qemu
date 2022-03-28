@@ -28,7 +28,8 @@
 #include "hw/pci-host/ls7a.h"
 #include "hw/pci-host/gpex.h"
 #include "hw/misc/unimp.h"
-
+#include "hw/acpi/aml-build.h"
+#include "qapi/qapi-visit-common.h"
 #include "target/loongarch/cpu.h"
 
 static struct _loaderparams {
@@ -63,11 +64,11 @@ static int64_t load_kernel_info(void)
 
 static void loongarch_devices_init(DeviceState *pch_pic)
 {
-    DeviceState *gpex_dev;
+    DeviceState *gpex_dev, *ls7a_pm;
     SysBusDevice *d;
     PCIBus *pci_bus;
     MemoryRegion *ecam_alias, *ecam_reg, *pio_alias, *pio_reg;
-    MemoryRegion *mmio_alias, *mmio_reg;
+    MemoryRegion *mmio_alias, *mmio_reg, *pm_reg;
     int i;
 
     gpex_dev = qdev_new(TYPE_GPEX_HOST);
@@ -133,6 +134,18 @@ static void loongarch_devices_init(DeviceState *pch_pic)
     sysbus_create_simple("ls7a_rtc", LS7A_RTC_REG_BASE,
                          qdev_get_gpio_in(pch_pic,
                          LS7A_RTC_IRQ - PCH_PIC_IRQ_OFFSET));
+    /* Init pm */
+    ls7a_pm = qdev_new(TYPE_LS7A_PM);
+    d = SYS_BUS_DEVICE(ls7a_pm);
+    sysbus_realize_and_unref(d, &error_fatal);
+    ls7a_pm_init(ls7a_pm, qdev_get_gpio_in(pch_pic,
+                                           ACPI_SCI_IRQ - PCH_PIC_IRQ_OFFSET));
+    pm_reg = sysbus_mmio_get_region(d, 0);
+    memory_region_add_subregion(get_system_memory(), ACPI_IO_BASE, pm_reg);
+    memory_region_add_subregion(pm_reg, LS7A_GPE0_STS_REG,
+                                sysbus_mmio_get_region(d, 1));
+    memory_region_add_subregion(pm_reg, LS7A_GPE0_RESET_REG,
+                                sysbus_mmio_get_region(d, 2));
 }
 
 static void loongarch_irq_init(LoongArchMachineState *lams)

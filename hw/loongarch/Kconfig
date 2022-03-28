@@ -14,3 +14,5 @@ config LOONGARCH_VIRT
     select LOONGARCH_PCH_MSI
     select LOONGARCH_EXTIOI
     select LS7A_RTC
+    select ACPI_LOONGARCH
+    select ACPI_PCI

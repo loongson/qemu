@@ -61,14 +61,6 @@ FIELD(RTC_CTRL, EO, 8, 1)
 #define TYPE_LS7A_RTC "ls7a_rtc"
 OBJECT_DECLARE_SIMPLE_TYPE(LS7ARtcState, LS7A_RTC)
 
-typedef struct LS7ARtcTimer {
-    QEMUTimer *timer;
-    int64_t save_offset;
-    int64_t enable_offset;
-    int32_t flag;
-    LS7ARtcState *d;
-} LS7ARtcTimer;
-
 struct LS7ARtcState {
     SysBusDevice parent_obj;
 
@@ -80,6 +72,9 @@ struct LS7ARtcState {
      */
     int64_t offset_toy;
     int64_t offset_rtc;
+    uint64_t save_toy_mon;
+    uint64_t save_toy_year;
+    uint64_t save_rtc;
     int64_t data;
     int tidx;
     uint32_t toymatch[3];
@@ -88,14 +83,182 @@ struct LS7ARtcState {
     uint32_t rtctrim;
     uint32_t rtccount;
     uint32_t rtcmatch[3];
-    LS7ARtcTimer toy_timer[TIMER_NUMS];
-    LS7ARtcTimer rtc_timer[TIMER_NUMS];
+    QEMUTimer *toy_timer[TIMER_NUMS];
+    QEMUTimer *rtc_timer[TIMER_NUMS];
     qemu_irq irq;
 };
 
-static int64_t ls7a_rtc_ticks(void)
+/* switch nanoseconds time to rtc ticks */
+static uint64_t ls7a_rtc_ticks(void)
 {
-    return qemu_clock_get_ms(rtc_clock) * LS7A_RTC_FREQ / 1000;
+    return qemu_clock_get_ns(rtc_clock) * LS7A_RTC_FREQ / NANOSECONDS_PER_SECOND;
+}
+
+/* switch rtc ticks to nanoseconds */
+static uint64_t ticks_to_ns(uint64_t ticks)
+{
+    return ticks * NANOSECONDS_PER_SECOND / LS7A_RTC_FREQ;
+}
+
+static inline bool toy_enabled(LS7ARtcState *s)
+{
+    return FIELD_EX32(s->cntrctl, RTC_CTRL, TOYEN) &&
+           FIELD_EX32(s->cntrctl, RTC_CTRL, EO);
+}
+
+static inline bool rtc_enabled(LS7ARtcState *s)
+{
+    return FIELD_EX32(s->cntrctl, RTC_CTRL, RTCEN) &&
+           FIELD_EX32(s->cntrctl, RTC_CTRL, EO);
+}
+
+/* parse toy value to struct tm */
+static void toy_val_to_time_mon(uint64_t toy_val, struct tm *tm)
+{
+    tm->tm_sec = FIELD_EX32(toy_val, TOY, SEC);
+    tm->tm_min = FIELD_EX32(toy_val, TOY, MIN);
+    tm->tm_hour = FIELD_EX32(toy_val, TOY, HOUR);
+    tm->tm_mday = FIELD_EX32(toy_val, TOY, DAY);
+    tm->tm_mon = FIELD_EX32(toy_val, TOY, MON) - 1;
+}
+
+static void toy_val_to_time_year(uint64_t toy_year, struct tm *tm)
+{
+    tm->tm_year = toy_year;
+}
+
+/* parse struct tm to toy value */
+static uint64_t toy_time_to_val_mon(struct tm tm)
+{
+    uint64_t val = 0;
+
+    val = FIELD_DP32(val, TOY, MON, tm.tm_mon + 1);
+    val = FIELD_DP32(val, TOY, DAY, tm.tm_mday);
+    val = FIELD_DP32(val, TOY, HOUR, tm.tm_hour);
+    val = FIELD_DP32(val, TOY, MIN, tm.tm_min);
+    val = FIELD_DP32(val, TOY, SEC, tm.tm_sec);
+    return val;
+}
+
+static uint64_t toy_time_to_val_year(struct tm tm)
+{
+    uint64_t year;
+
+    year = tm.tm_year;
+    return year;
+}
+
+static void toymatch_val_to_time(uint64_t val, struct tm *tm)
+{
+    tm->tm_sec = FIELD_EX32(val, TOY_MATCH, SEC);
+    tm->tm_min = FIELD_EX32(val, TOY_MATCH, MIN);
+    tm->tm_hour = FIELD_EX32(val, TOY_MATCH, HOUR);
+    tm->tm_mday = FIELD_EX32(val, TOY_MATCH, DAY);
+    tm->tm_mon = FIELD_EX32(val, TOY_MATCH, MON) - 1;
+    tm->tm_year += (FIELD_EX32(val, TOY_MATCH, YEAR) - (tm->tm_year & 0x3f));
+}
+
+static void toymatch_write(LS7ARtcState *s, struct tm *tm, uint64_t val, int num)
+{
+    int64_t now, expire_time;
+
+    /* it do not support write when toy disabled */
+    if (toy_enabled(s)) {
+        s->toymatch[num] = val;
+        /* caculate expire time */
+        now = qemu_clock_get_ms(rtc_clock);
+        toymatch_val_to_time(val, tm);
+        expire_time = now + (qemu_timedate_diff(tm) - s->offset_toy) * 1000;
+        timer_mod(s->toy_timer[num], expire_time);
+    }
+}
+
+static void rtcmatch_write(LS7ARtcState *s, uint64_t val, int num)
+{
+    uint64_t expire_ns;
+
+    /* it do not support write when toy disabled */
+    if (rtc_enabled(s)) {
+        s->rtcmatch[num] = val;
+        /* caculate expire time */
+        expire_ns = ticks_to_ns(val) - ticks_to_ns(s->offset_rtc);
+        timer_mod_ns(s->rtc_timer[num], expire_ns);
+    }
+}
+
+static void ls7a_toy_stop(LS7ARtcState *s)
+{
+    int i;
+    struct tm tm;
+    /*
+     * save time when disabled toy,
+     * because toy time not add counters.
+     */
+    qemu_get_timedate(&tm, s->offset_toy);
+    s->save_toy_mon = toy_time_to_val_mon(tm);
+    s->save_toy_year = toy_time_to_val_year(tm);
+
+    /* delete timers, and when re-enabled, recaculate expire time */
+    for (i = 0; i < TIMER_NUMS; i++) {
+        timer_del(s->toy_timer[i]);
+    }
+}
+
+static void ls7a_rtc_stop(LS7ARtcState *s)
+{
+    int i;
+    uint64_t time;
+
+    /* save rtc time */
+    time = ls7a_rtc_ticks() + s->offset_rtc;
+    s->save_rtc = time;
+
+    /* delete timers, and when re-enabled, recaculate expire time */
+    for (i = 0; i < TIMER_NUMS; i++) {
+        timer_del(s->rtc_timer[i]);
+    }
+}
+
+static void ls7a_toy_start(LS7ARtcState *s)
+{
+    int i;
+    uint64_t expire_time, now;
+    struct tm tm;
+    /*
+     * need to recaculate toy offset
+     * and expire time when enable it.
+     */
+    toy_val_to_time_mon(s->save_toy_mon, &tm);
+    toy_val_to_time_year(s->save_toy_year, &tm);
+
+    s->offset_toy = qemu_timedate_diff(&tm);
+    now = qemu_clock_get_ms(rtc_clock);
+
+    /* recaculate expire time and enable timer */
+    for (i = 0; i < TIMER_NUMS; i++) {
+        toymatch_val_to_time(s->toymatch[i], &tm);
+        expire_time = now + (qemu_timedate_diff(&tm) - s->offset_toy) * 1000;
+        timer_mod(s->toy_timer[i], expire_time);
+    }
+}
+
+static void ls7a_rtc_start(LS7ARtcState *s)
+{
+    int i;
+    uint64_t expire_time, now;
+
+    /*
+     * need to recaculate rtc offset
+     * and expire time when enable it.
+     */
+    now = ls7a_rtc_ticks();
+    s->offset_rtc = s->save_rtc - now;
+
+    /* recaculate expire time and enable timer */
+    for (i = 0; i < TIMER_NUMS; i++) {
+        expire_time = ticks_to_ns(s->rtcmatch[i]) - ticks_to_ns(s->offset_rtc);
+        timer_mod_ns(s->rtc_timer[i], expire_time);
+    }
 }
 
 static uint64_t ls7a_rtc_read(void *opaque, hwaddr addr, unsigned size)
@@ -106,16 +269,24 @@ static uint64_t ls7a_rtc_read(void *opaque, hwaddr addr, unsigned size)
 
     switch (addr) {
     case SYS_TOYREAD0:
-        qemu_get_timedate(&tm, s->offset_toy);
-        val = FIELD_DP32(val, TOY, MON, tm.tm_mon + 1);
-        val = FIELD_DP32(val, TOY, DAY, tm.tm_mday);
-        val = FIELD_DP32(val, TOY, HOUR, tm.tm_hour);
-        val = FIELD_DP32(val, TOY, MIN, tm.tm_min);
-        val = FIELD_DP32(val, TOY, SEC, tm.tm_sec);
+        /* if toy disabled, read save toy time */
+        if (toy_enabled(s)) {
+            qemu_get_timedate(&tm, s->offset_toy);
+            val = toy_time_to_val_mon(tm);
+        } else {
+            /* read save mon val */
+            val = s->save_toy_mon;
+        }
         break;
     case SYS_TOYREAD1:
-        qemu_get_timedate(&tm, s->offset_toy);
-        val = tm.tm_year;
+        /* if toy disabled, read save toy time */
+        if (toy_enabled(s)) {
+            qemu_get_timedate(&tm, s->offset_toy);
+            val = tm.tm_year;
+        } else {
+            /* read save year val */
+            val = s->save_toy_year;
+        }
         break;
     case SYS_TOYMATCH0:
         val = s->toymatch[0];
@@ -130,7 +301,12 @@ static uint64_t ls7a_rtc_read(void *opaque, hwaddr addr, unsigned size)
         val = s->cntrctl;
         break;
     case SYS_RTCREAD0:
-        val = ls7a_rtc_ticks() + s->offset_rtc;
+        /* if rtc disabled, read save rtc time */
+        if (rtc_enabled(s)) {
+            val = ls7a_rtc_ticks() + s->offset_rtc;
+        } else {
+            val = s->save_rtc;
+        }
         break;
     case SYS_RTCMATCH0:
         val = s->rtcmatch[0];
@@ -148,131 +324,32 @@ static uint64_t ls7a_rtc_read(void *opaque, hwaddr addr, unsigned size)
     return val;
 }
 
-static void toymatch_write(LS7ARtcState *s, struct tm *tm, uint64_t val, int num)
-{
-    int64_t alarm_offset, year_diff, expire_time;
-
-    if (FIELD_EX32(s->cntrctl, RTC_CTRL, TOYEN) &&
-        FIELD_EX32(s->cntrctl, RTC_CTRL, EO)) {
-        s->toymatch[num] = val;
-        s->toy_timer[num].flag = 1;
-        qemu_get_timedate(tm, s->offset_toy);
-        tm->tm_sec = FIELD_EX32(val, TOY_MATCH, SEC);
-        tm->tm_min = FIELD_EX32(val, TOY_MATCH, MIN);
-        tm->tm_hour = FIELD_EX32(val, TOY_MATCH, HOUR);
-        tm->tm_mday = FIELD_EX32(val, TOY_MATCH, DAY);
-        tm->tm_mon = FIELD_EX32(val, TOY_MATCH, MON) - 1;
-        year_diff = FIELD_EX32(val, TOY_MATCH, MON);
-        year_diff = year_diff - (tm->tm_year & 0x3f);
-        tm->tm_year = tm->tm_year + year_diff;
-        alarm_offset = qemu_timedate_diff(tm) - s->offset_toy;
-        if ((alarm_offset < 0) && (alarm_offset > -5)) {
-            alarm_offset = 0;
-        }
-        expire_time = qemu_clock_get_ms(rtc_clock);
-        expire_time += ((alarm_offset * 1000) + 100);
-        timer_mod(s->toy_timer[num].timer, expire_time);
-    }
-}
-
-static void rtcmatch_write(LS7ARtcState *s, uint64_t val, int num)
-{
-    uint64_t expire_time, time_offset;
-    uint64_t now = ls7a_rtc_ticks();
-    time_offset = val - now - s->offset_rtc;
-    /* change ticks to ms */
-    time_offset /= (LS7A_RTC_FREQ / 1000);
-    expire_time = (now * 1000 / LS7A_RTC_FREQ) + time_offset;
-    if (FIELD_EX32(s->cntrctl, RTC_CTRL, RTCEN) &&
-        FIELD_EX32(s->cntrctl, RTC_CTRL, EO)) {
-        s->rtcmatch[num] = val;
-        /* set timer flag bit */
-        s->rtc_timer[num].flag = 1;
-        timer_mod(s->rtc_timer[num].timer, expire_time);
-    }
-}
-
-static void ls7a_start_toymatch(LS7ARtcState *s)
-{
-    int i;
-    uint64_t expire_time, now;
-
-    now = qemu_clock_get_ms(rtc_clock);
-    for (i = 0; i < TIMER_NUMS; i++) {
-        if (s->toy_timer[i].flag) {
-            expire_time = s->toy_timer[i].enable_offset + now;
-            timer_mod(s->toy_timer[i].timer, expire_time);
-        }
-    }
-}
-
-static void ls7a_stop_toymatch(LS7ARtcState *s)
-{
-    int i;
-    uint64_t now;
-
-    now = qemu_clock_get_ms(rtc_clock);
-    for (i = 0; i < TIMER_NUMS; i++) {
-        if (s->toy_timer[i].flag) {
-            s->toy_timer[i].enable_offset = s->toy_timer[i].timer->expire_time
-                                            - now;
-            timer_del(s->toy_timer[i].timer);
-        }
-    }
-}
-
-static void ls7a_start_rtcmatch(LS7ARtcState *s)
-{
-    int i;
-    uint64_t expire_time, now;
-
-    now = ls7a_rtc_ticks();
-    for (i = 0; i < TIMER_NUMS; i++) {
-        if (s->rtc_timer[i].flag) {
-            /* change rtc counters to ms */
-            expire_time = now + s->rtc_timer[i].enable_offset;
-            expire_time /= (LS7A_RTC_FREQ / 1000);
-            timer_mod(s->rtc_timer[i].timer, expire_time);
-        }
-    }
-}
-
-static void ls7a_stop_rtcmatch(LS7ARtcState *s)
-{
-    int i;
-    uint64_t now;
-
-    now = ls7a_rtc_ticks();
-    for (i = 0; i < TIMER_NUMS; i++) {
-        if (s->rtc_timer[i].flag) {
-            s->rtc_timer[i].enable_offset = s->rtcmatch[i] -
-                                            now - s->offset_rtc;
-            timer_del(s->rtc_timer[i].timer);
-        }
-    }
-}
-
 static void ls7a_rtc_write(void *opaque, hwaddr addr,
                            uint64_t val, unsigned size)
 {
-    int ctrl_diff, ctrl_old;
+    int old_eo, old_toyen, old_rtcen, new_eo, new_toyen, new_rtcen;
     LS7ARtcState *s = LS7A_RTC(opaque);
     struct tm tm;
 
     switch (addr) {
     case SYS_TOYWRITE0:
-        qemu_get_timedate(&tm, s->offset_toy);
-        tm.tm_sec = FIELD_EX32(val, TOY, SEC);
-        tm.tm_min = FIELD_EX32(val, TOY, MIN);
-        tm.tm_hour = FIELD_EX32(val, TOY, HOUR);
-        tm.tm_mday = FIELD_EX32(val, TOY, DAY);
-        tm.tm_mon = FIELD_EX32(val, TOY, MON) - 1;
-        s->offset_toy = qemu_timedate_diff(&tm);
+        /* it do not support write when toy disabled */
+        if (toy_enabled(s)) {
+            qemu_get_timedate(&tm, s->offset_toy);
+            tm.tm_sec = FIELD_EX32(val, TOY, SEC);
+            tm.tm_min = FIELD_EX32(val, TOY, MIN);
+            tm.tm_hour = FIELD_EX32(val, TOY, HOUR);
+            tm.tm_mday = FIELD_EX32(val, TOY, DAY);
+            tm.tm_mon = FIELD_EX32(val, TOY, MON) - 1;
+            s->offset_toy = qemu_timedate_diff(&tm);
+        }
     break;
     case SYS_TOYWRITE1:
-        qemu_get_timedate(&tm, s->offset_toy);
-        tm.tm_year = val;
-        s->offset_toy = qemu_timedate_diff(&tm);
+        if (toy_enabled(s)) {
+            qemu_get_timedate(&tm, s->offset_toy);
+            tm.tm_year = val;
+            s->offset_toy = qemu_timedate_diff(&tm);
+        }
         break;
     case SYS_TOYMATCH0:
         toymatch_write(s, &tm, val, 0);
@@ -284,63 +361,59 @@ static void ls7a_rtc_write(void *opaque, hwaddr addr,
         toymatch_write(s, &tm, val, 2);
         break;
     case SYS_RTCCTRL:
-        ctrl_old = s->cntrctl;
-        ctrl_diff = ctrl_old ^ val;
+        /* get old ctrl */
+        old_eo = FIELD_EX32(s->cntrctl, RTC_CTRL, EO);
+        old_toyen = toy_enabled(s);
+        old_rtcen = rtc_enabled(s);
+
         s->cntrctl = val;
+        /* get new ctrl */
+        new_eo = FIELD_EX32(s->cntrctl, RTC_CTRL, EO);
+        new_toyen = toy_enabled(s);
+        new_rtcen = rtc_enabled(s);
+
         /* if EO changed */
-        if (FIELD_EX32(ctrl_diff, RTC_CTRL, EO)) {
+        if (old_eo != new_eo) {
             /* enable EO */
-            if (FIELD_EX32(val, RTC_CTRL, EO)) {
-                /* if toy or rtc enabled now */
-                if (FIELD_EX32(val, RTC_CTRL, TOYEN)) {
-                    ls7a_start_toymatch(s);
+            if (new_eo) {
+                /* toy enabled or rtc enabled should start timer */
+                if (new_toyen) {
+		    ls7a_toy_start(s);
                 }
-                if (FIELD_EX32(val, RTC_CTRL, RTCEN)) {
-                    ls7a_start_rtcmatch(s);
+                if (new_rtcen) {
+		    ls7a_rtc_start(s);
                 }
             } else {
-                /* if EO disabled */
-                if (FIELD_EX32(ctrl_old, RTC_CTRL, TOYEN)) {
-                    ls7a_stop_toymatch(s);
+                /* disable eo should stop rtc and toy timer */
+                if (old_toyen) {
+                    ls7a_toy_stop(s);
                 }
-                if (FIELD_EX32(ctrl_old, RTC_CTRL, RTCEN)) {
-                    ls7a_stop_rtcmatch(s);
+                if (old_rtcen) {
+                    ls7a_rtc_stop(s);
                 }
             }
         } else {
-            /* EO not changed */
-            if (FIELD_EX32(ctrl_diff, RTC_CTRL, TOYEN)) {
-                /* enable TOYEN */
-                if (FIELD_EX32(val, RTC_CTRL, TOYEN)) {
-                    if (FIELD_EX32(val, RTC_CTRL, EO)) {
-                        ls7a_start_toymatch(s);
-                    }
-                } else {
-                /* disable TOYEN */
-                    if (FIELD_EX32(ctrl_old, RTC_CTRL, EO)) {
-                        /* if EO not enabled, rtc has already stopeed */
-                        ls7a_stop_toymatch(s);
-                    }
+            /* toy or rtc enabled should start timer. otherwise, stop timer */
+            if (old_toyen != new_toyen) {
+                if (toy_enabled(s)) {
+		    ls7a_toy_start(s);
+                } else if (!new_toyen) {
+                    ls7a_toy_stop(s);
                 }
             }
-            if (FIELD_EX32(ctrl_diff, RTC_CTRL, RTCEN)) {
-                /* enable RTCEN */
-                if (FIELD_EX32(val, RTC_CTRL, RTCEN)) {
-                    if (FIELD_EX32(val, RTC_CTRL, EO)) {
-                        ls7a_start_rtcmatch(s);
-                    }
-                } else {
-                /* disable RTCEN */
-                    if (FIELD_EX32(ctrl_old, RTC_CTRL, EO)) {
-                        /* if EO not enabled, rtc has already stopeed */
-                        ls7a_stop_rtcmatch(s);
-                    }
+            if (old_rtcen != new_rtcen) {
+                if (rtc_enabled(s)) {
+		    ls7a_rtc_start(s);
+                } else if (!new_rtcen) {
+                    ls7a_rtc_stop(s);
                 }
             }
         }
         break;
     case SYS_RTCWRTIE0:
-        s->offset_rtc = val - ls7a_rtc_ticks();
+        if (rtc_enabled(s)) {
+            s->offset_rtc = val - ls7a_rtc_ticks();
+        }
         break;
     case SYS_RTCMATCH0:
         rtcmatch_write(s, val, 0);
@@ -366,26 +439,20 @@ static const MemoryRegionOps ls7a_rtc_ops = {
     },
 };
 
-static void toy_timer(void *opaque)
+static void toy_timer_cb(void *opaque)
 {
-    LS7ARtcTimer *timer = opaque;
-    LS7ARtcState *s = timer->d;
+    LS7ARtcState *s = opaque;
 
-    if (FIELD_EX32(s->cntrctl, RTC_CTRL, TOYEN)
-        && FIELD_EX32(s->cntrctl, RTC_CTRL, EO)) {
-        timer->flag = 0;
+    if (toy_enabled(s)) {
         qemu_irq_pulse(s->irq);
     }
 }
 
-static void rtc_timer(void *opaque)
+static void rtc_timer_cb(void *opaque)
 {
-    LS7ARtcTimer *timer = opaque;
-    LS7ARtcState *s = timer->d;
+    LS7ARtcState *s = opaque;
 
-    if (FIELD_EX32(s->cntrctl, RTC_CTRL, RTCEN)
-        && FIELD_EX32(s->cntrctl, RTC_CTRL, EO)) {
-        timer->flag = 0;
+    if (rtc_enabled(s)) {
         qemu_irq_pulse(s->irq);
     }
 }
@@ -402,17 +469,16 @@ static void ls7a_rtc_realize(DeviceState *dev, Error **errp)
 
     sysbus_init_mmio(sbd, &d->iomem);
     for (i = 0; i < TIMER_NUMS; i++) {
-        d->toy_timer[i].d = d;
-        d->rtc_timer[i].d = d;
-        d->toy_timer[i].timer = timer_new_ms(rtc_clock, toy_timer,
-                                             &d->toy_timer[i]);
-        d->rtc_timer[i].timer = timer_new_ms(rtc_clock, rtc_timer,
-                                             &d->rtc_timer[i]);
-        d->toy_timer[i].flag = 0;
-        d->rtc_timer[i].flag = 0;
+        d->toymatch[i] = 0;
+        d->rtcmatch[i] = 0;
+        d->toy_timer[i] = timer_new_ms(rtc_clock, toy_timer_cb, d);
+        d->rtc_timer[i] = timer_new_ms(rtc_clock, rtc_timer_cb, d);
     }
     d->offset_toy = 0;
     d->offset_rtc = 0;
+    d->save_toy_mon = 0;
+    d->save_toy_year = 0;
+    d->save_rtc = 0;
 
     create_unimplemented_device("mmio fallback 1", 0x10013ffc, 0x4);
 }
@@ -420,68 +486,26 @@ static void ls7a_rtc_realize(DeviceState *dev, Error **errp)
 static int ls7a_rtc_pre_save(void *opaque)
 {
     LS7ARtcState *s = LS7A_RTC(opaque);
-    struct tm tm;
-    int64_t year_diff, toy_val, rtc_val, rtc_diff, now;
-    int i;
-    now = ls7a_rtc_ticks();
-    qemu_get_timedate(&tm, s->offset_toy);
-    for (i = 0; i < TIMER_NUMS; i++) {
-        if (s->toy_timer[i].flag) {
-            toy_val = s->toymatch[i];
-            tm.tm_sec = FIELD_EX32(toy_val, TOY_MATCH, SEC);
-            tm.tm_min = FIELD_EX32(toy_val, TOY_MATCH, MIN);
-            tm.tm_hour = FIELD_EX32(toy_val, TOY_MATCH, HOUR);
-            tm.tm_mday = FIELD_EX32(toy_val, TOY_MATCH, DAY);
-            tm.tm_mon = FIELD_EX32(toy_val, TOY_MATCH, MON) - 1;
-            year_diff = FIELD_EX32(toy_val, TOY_MATCH, MON);
-            year_diff = year_diff - (tm.tm_year & 0x3f);
-            tm.tm_year = tm.tm_year + year_diff;
-            s->toy_timer[i].save_offset = qemu_timedate_diff(&tm)
-                                          - s->offset_toy;
-        }
-        if (s->rtc_timer[i].flag) {
-            rtc_val = s->rtcmatch[i];
-            rtc_diff = rtc_val - now - s->offset_rtc;
-            s->rtc_timer[i].save_offset = rtc_diff;
-        }
-    }
+
+    ls7a_toy_stop(s);
+    ls7a_rtc_stop(s);
+
     return 0;
 }
 
 static int ls7a_rtc_post_load(void *opaque, int version_id)
 {
     LS7ARtcState *s = LS7A_RTC(opaque);
-    int64_t expire_time;
-    int i;
-    uint64_t now, ticks;
-
-    now = qemu_clock_get_ms(rtc_clock);
-    ticks = ls7a_rtc_ticks();
-    for (i = 0; i < TIMER_NUMS; i++) {
-        if (s->toy_timer[i].flag) {
-            expire_time = now + (s->toy_timer[i].save_offset * 1000);
-            timer_mod(s->toy_timer[i].timer, expire_time);
-        }
-        if (s->rtc_timer[i].flag) {
-            expire_time = ticks + s->rtc_timer[i].save_offset;
-            expire_time = (expire_time * 1000 / LS7A_RTC_FREQ);
-            timer_mod(s->rtc_timer[i].timer, expire_time);
-        }
+    if (toy_enabled(s)) {
+        ls7a_toy_start(s);
     }
+
+    if (rtc_enabled(s)) {
+        ls7a_rtc_start(s);
+    }
+
     return 0;
 }
-
-static const VMStateDescription vmstate_ls7a_rtc_timer = {
-    .name = "ls7a_rtc_timer",
-    .version_id = 1,
-    .minimum_version_id = 1,
-    .fields = (VMStateField[]) {
-        VMSTATE_INT32(flag, LS7ARtcTimer),
-        VMSTATE_INT64(enable_offset, LS7ARtcTimer),
-        VMSTATE_INT64(save_offset, LS7ARtcTimer),
-        VMSTATE_END_OF_LIST()
-    }
-};
 
 static const VMStateDescription vmstate_ls7a_rtc = {
     .name = "ls7a_rtc",
@@ -492,13 +516,12 @@ static const VMStateDescription vmstate_ls7a_rtc = {
     .fields = (VMStateField[]) {
         VMSTATE_INT64(offset_toy, LS7ARtcState),
         VMSTATE_INT64(offset_rtc, LS7ARtcState),
+        VMSTATE_UINT64(save_toy_mon, LS7ARtcState),
+        VMSTATE_UINT64(save_toy_year, LS7ARtcState),
+        VMSTATE_UINT64(save_rtc, LS7ARtcState),
         VMSTATE_UINT32_ARRAY(toymatch, LS7ARtcState, TIMER_NUMS),
         VMSTATE_UINT32_ARRAY(rtcmatch, LS7ARtcState, TIMER_NUMS),
         VMSTATE_UINT32(cntrctl, LS7ARtcState),
-        VMSTATE_STRUCT_ARRAY(toy_timer, LS7ARtcState, TIMER_NUMS, 1,
-                             vmstate_ls7a_rtc_timer, LS7ARtcTimer),
-        VMSTATE_STRUCT_ARRAY(rtc_timer, LS7ARtcState, TIMER_NUMS, 1,
-                             vmstate_ls7a_rtc_timer, LS7ARtcTimer),
         VMSTATE_END_OF_LIST()
     }
 };

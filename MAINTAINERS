@@ -1138,6 +1138,8 @@ F: include/hw/intc/loongarch_*.h
 F: hw/intc/loongarch_*.c
 F: include/hw/pci-host/ls7a.h
 F: hw/rtc/ls7a_rtc.c
+F: include/hw/acpi/ls7a.h
+F: hw/acpi/ls7a.c
 
 M68K Machines
 -------------
