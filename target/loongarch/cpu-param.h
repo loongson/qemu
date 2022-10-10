@@ -16,4 +16,6 @@
 
 #define TCG_GUEST_DEFAULT_MO (0)
 
+#define TARGET_LOONGARCH64_OABI 1
+
 #endif

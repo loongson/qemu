@@ -450,8 +450,8 @@ struct target_dirent64 {
 #define TARGET_SIG_IGN  ((abi_long)1)   /* ignore signal */
 #define TARGET_SIG_ERR  ((abi_long)-1)  /* error return from signal */
 
-#ifdef TARGET_MIPS
-#define TARGET_NSIG        128
+#if defined(TARGET_MIPS) || defined(TARGET_LOONGARCH64)
+#define TARGET_NSIG	   128
 #else
 #define TARGET_NSIG        64
 #endif
@@ -1974,9 +1974,9 @@ struct target_stat64  {
     abi_ulong __unused5;
 };
 
-#elif defined(TARGET_OPENRISC) \
-    || defined(TARGET_RISCV) || defined(TARGET_HEXAGON) || defined(TARGET_LOONGARCH)
-
+#elif defined(TARGET_OPENRISC) || defined(TARGET_NIOS2) \
+        || defined(TARGET_RISCV) || defined(TARGET_HEXAGON) || \
+        defined(TARGET_LOONGARCH64)
 /* These are the asm-generic versions of the stat and stat64 structures */
 
 #define TARGET_STAT_HAVE_NSEC
@@ -2003,7 +2003,7 @@ struct target_stat {
     abi_uint __unused5;
 };
 
-#if !defined(TARGET_RISCV64)
+#if !defined(TARGET_RISCV64) || defined(TARGET_LOONGARCH64)
 #define TARGET_HAS_STRUCT_STAT64
 struct target_stat64 {
     abi_ullong st_dev;
