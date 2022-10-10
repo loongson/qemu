@@ -14,4 +14,6 @@
 
 #define TARGET_PAGE_BITS 14
 
+#define TARGET_LOONGARCH64_OABI 1
+
 #endif

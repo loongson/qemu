@@ -84,6 +84,8 @@
 #define TARGET_NR_splice 76
 #define TARGET_NR_tee 77
 #define TARGET_NR_readlinkat 78
+#define TARGET_NR_newfstatat 79
+#define TARGET_NR_fstat 80
 #define TARGET_NR_sync 81
 #define TARGET_NR_fsync 82
 #define TARGET_NR_fdatasync 83
@@ -166,6 +168,8 @@
 #define TARGET_NR_uname 160
 #define TARGET_NR_sethostname 161
 #define TARGET_NR_setdomainname 162
+#define TARGET_NR_getrlimit 163
+#define TARGET_NR_setrlimit 164
 #define TARGET_NR_getrusage 165
 #define TARGET_NR_umask 166
 #define TARGET_NR_prctl 167
