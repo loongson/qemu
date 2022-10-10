@@ -1972,8 +1972,7 @@ struct target_stat64  {
 };
 
 #elif defined(TARGET_OPENRISC) || defined(TARGET_NIOS2) \
-        || defined(TARGET_RISCV) || defined(TARGET_HEXAGON) || \
-        defined(TARGET_LOONGARCH64)
+        || defined(TARGET_RISCV) || defined(TARGET_HEXAGON)
 
 /* These are the asm-generic versions of the stat and stat64 structures */
 
@@ -2001,7 +2000,7 @@ struct target_stat {
     abi_uint __unused5;
 };
 
-#if !defined(TARGET_RISCV64) || defined(TARGET_LOONGARCH64)
+#if !defined(TARGET_RISCV64)
 #define TARGET_HAS_STRUCT_STAT64
 struct target_stat64 {
     abi_ullong st_dev;
@@ -2087,6 +2086,30 @@ struct target_stat64 {
 #elif defined(TARGET_LOONGARCH64)
 
 /* LoongArch no newfstatat/fstat syscall. */
+
+#define TARGET_STAT_HAVE_NSEC
+struct target_stat {
+    abi_ulong st_dev;
+    abi_ulong st_ino;
+    unsigned int st_mode;
+    unsigned int st_nlink;
+    unsigned int st_uid;
+    unsigned int st_gid;
+    abi_ulong st_rdev;
+    abi_ulong __pad1;
+    abi_long st_size;
+    int st_blksize;
+    int __pad2;
+    abi_long st_blocks;
+    abi_long target_st_atime;
+    abi_ulong target_st_atime_nsec;
+    abi_long target_st_mtime;
+    abi_ulong target_st_mtime_nsec;
+    abi_long target_st_ctime;
+    abi_ulong target_st_ctime_nsec;
+    unsigned int __unused4;
+    unsigned int __unused5;
+};
 
 #else
 #error unsupported CPU
