@@ -142,11 +142,26 @@ static void prep_divisor_du(TCGv ret, TCGv src2)
     tcg_gen_movcond_tl(TCG_COND_EQ, ret, src2, zero, one, src2);
 }
 
+static void prep_div(TCGv divisor, TCGv dividend, TCGv src1, TCGv src2)
+{
+    TCGv zero = tcg_constant_tl(0);
+    TCGv one = tcg_constant_tl(1);
+
+    /*
+     * If x / 0, set the diviend to 0 set the divisor to 1
+     * this is the same with LoongArch host.
+     */
+    tcg_gen_movcond_tl(TCG_COND_EQ, dividend, src2, zero, zero, src1);
+    tcg_gen_movcond_tl(TCG_COND_EQ, divisor, src2, zero, one, src2);
+}
+
 static void gen_div_d(TCGv dest, TCGv src1, TCGv src2)
 {
     TCGv t0 = tcg_temp_new();
-    prep_divisor_d(t0, src1, src2);
-    tcg_gen_div_tl(dest, src1, t0);
+    TCGv t1 = tcg_temp_new();
+
+    prep_div(t0, t1, src1, src2);
+    tcg_gen_div_tl(dest, t1, t0);
 }
 
 static void gen_rem_d(TCGv dest, TCGv src1, TCGv src2)
@@ -159,8 +174,9 @@ static void gen_rem_d(TCGv dest, TCGv src1, TCGv src2)
 static void gen_div_du(TCGv dest, TCGv src1, TCGv src2)
 {
     TCGv t0 = tcg_temp_new();
-    prep_divisor_du(t0, src2);
-    tcg_gen_divu_tl(dest, src1, t0);
+    TCGv t1 = tcg_temp_new();
+    prep_div(t0, t1, src1, src2);
+    tcg_gen_divu_tl(dest, t1, t0);
 }
 
 static void gen_rem_du(TCGv dest, TCGv src1, TCGv src2)
@@ -173,9 +189,10 @@ static void gen_rem_du(TCGv dest, TCGv src1, TCGv src2)
 static void gen_div_w(TCGv dest, TCGv src1, TCGv src2)
 {
     TCGv t0 = tcg_temp_new();
-    /* We need not check for integer overflow for div_w. */
-    prep_divisor_du(t0, src2);
-    tcg_gen_div_tl(dest, src1, t0);
+    TCGv t1 = tcg_temp_new();
+
+    prep_div(t0, t1, src1, src2);
+    tcg_gen_div_tl(dest, t1, t0);
 }
 
 static void gen_rem_w(TCGv dest, TCGv src1, TCGv src2)
