@@ -110,7 +110,7 @@ restore_sigcontext(CPULoongArchState *env, struct target_sigcontext *sc)
     }
 
     for (i = 0; i < 32; ++i) {
-        __get_user(env->fpr[i].vreg.UD(0), &sc->sc_fpregs[i].val64[0]);
+        __get_user(env->fpr[i].vreg.D(0), &sc->sc_fpregs[i].val64[0]);
     }
 }
 
