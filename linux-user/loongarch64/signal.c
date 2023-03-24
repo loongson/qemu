@@ -16,6 +16,9 @@
 
 #ifdef TARGET_LOONGARCH64_OABI
 #define FPU_REG_WIDTH 256
+
+#define USED_FP                 (1 << 0)
+
 union fpureg {
     uint32_t val32[FPU_REG_WIDTH / 32];
     uint64_t val64[FPU_REG_WIDTH / 64];
@@ -37,9 +40,9 @@ struct target_ucontext {
     target_ulong tuc_flags;
     struct target_ucontext *tuc_link;
     target_stack_t tuc_stack;
+    struct target_sigcontext tuc_mcontext;
     target_sigset_t tuc_sigmask;
     uint8_t __unused[1024 / 8 - sizeof(target_sigset_t)];
-    struct target_sigcontext tuc_mcontext;
 };
 
 struct target_rt_sigframe {
@@ -74,6 +77,7 @@ static inline void setup_sigcontext(CPULoongArchState *env,
     __put_user(0, &sc->sc_regs[0]);
     __put_user(env->fcsr0, &sc->sc_fcsr);
     __put_user(0, &sc->sc_vcsr);
+    __put_user(USED_FP, &sc->sc_flags);
     sc->sc_fcc = read_all_fcc(env);
 
     for (i = 0; i < 4; ++i) {
@@ -86,6 +90,9 @@ static inline void setup_sigcontext(CPULoongArchState *env,
 
     for (i = 0; i < 32; ++i) {
         __put_user(env->fpr[i].vreg.UD(0), &sc->sc_fpregs[i].val64[0]);
+        __put_user(env->fpr[i].vreg.D(0), &sc->sc_fpregs[i].val64[0]);
+	/* setup LSX register high 64-bits */
+        __put_user(env->fpr[i].vreg.D(1), &sc->sc_fpregs[i].val64[1]);
     }
 }
 
