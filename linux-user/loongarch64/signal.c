@@ -93,6 +93,10 @@ static inline void setup_sigcontext(CPULoongArchState *env,
         __put_user(env->fpr[i].vreg.D(0), &sc->sc_fpregs[i].val64[0]);
 	/* setup LSX register high 64-bits */
         __put_user(env->fpr[i].vreg.D(1), &sc->sc_fpregs[i].val64[1]);
+
+        /* setup LASX register high 128 bit */
+        __put_user(env->fpr[i].vreg.D(2), &sc->sc_fpregs[i].val64[2]);
+        __put_user(env->fpr[i].vreg.D(3), &sc->sc_fpregs[i].val64[3]);
     }
 }
 
