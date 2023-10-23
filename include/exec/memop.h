@@ -140,6 +140,7 @@ typedef enum MemOp {
     MO_TEUL  = MO_TE | MO_UL,
     MO_TEUQ  = MO_TE | MO_UQ,
     MO_TEUO  = MO_TE | MO_UO,
+    MO_TESB  = MO_TE | MO_SB,
     MO_TESW  = MO_TE | MO_SW,
     MO_TESL  = MO_TE | MO_SL,
     MO_TESQ  = MO_TE | MO_SQ,
