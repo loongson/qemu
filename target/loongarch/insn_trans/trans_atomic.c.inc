@@ -17,6 +17,14 @@ static bool gen_ll(DisasContext *ctx, arg_rr_i *a, MemOp mop)
     return true;
 }
 
+static bool gen_llacq(DisasContext *ctx, arg_rr *a, MemOp mop)
+{
+    arg_rr_i tmp_a = {
+        .rd = a->rd, .rj = a->rj, .imm = 0
+    };
+    return gen_ll(ctx, &tmp_a, mop);
+}
+
 static bool gen_sc(DisasContext *ctx, arg_rr_i *a, MemOp mop)
 {
     TCGv dest = gpr_dst(ctx, a->rd, EXT_NONE);
@@ -43,6 +51,14 @@ static bool gen_sc(DisasContext *ctx, arg_rr_i *a, MemOp mop)
     gen_set_gpr(a->rd, dest, EXT_NONE);
 
     return true;
+}
+
+static bool gen_screl(DisasContext *ctx, arg_rr *a, MemOp mop)
+{
+    arg_rr_i tmp_a = {
+        .rd = a->rd, .rj = a->rj, .imm = 0
+    };
+    return gen_sc(ctx, &tmp_a, mop);
 }
 
 static bool gen_cas(DisasContext *ctx, arg_rrr *a,
@@ -89,6 +105,10 @@ TRANS(ll_w, ALL, gen_ll, MO_TESL)
 TRANS(sc_w, ALL, gen_sc, MO_TESL)
 TRANS(ll_d, 64, gen_ll, MO_TEUQ)
 TRANS(sc_d, 64, gen_sc, MO_TEUQ)
+TRANS(llacq_w, LLACQ_SCREL, gen_llacq, MO_TESL)
+TRANS(screl_w, LLACQ_SCREL, gen_screl, MO_TESL)
+TRANS(llacq_d, LLACQ_SCREL_64, gen_llacq, MO_TEUQ)
+TRANS(screl_d, LLACQ_SCREL_64, gen_screl, MO_TEUQ)
 TRANS(amcas_b, LAMCAS, gen_cas, tcg_gen_atomic_cmpxchg_tl, MO_TESB)
 TRANS(amcas_h, LAMCAS, gen_cas, tcg_gen_atomic_cmpxchg_tl, MO_TESW)
 TRANS(amcas_w, LAMCAS, gen_cas, tcg_gen_atomic_cmpxchg_tl, MO_TESL)
