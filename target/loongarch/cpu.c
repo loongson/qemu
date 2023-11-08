@@ -398,6 +398,10 @@ static void loongarch_la464_initfn(Object *obj)
     data = FIELD_DP32(data, CPUCFG2, LLFTP_VER, 1);
     data = FIELD_DP32(data, CPUCFG2, LSPW, 1);
     data = FIELD_DP32(data, CPUCFG2, LAM, 1);
+    data = FIELD_DP32(data, CPUCFG2, FRECIPE, 1);
+    data = FIELD_DP32(data, CPUCFG2, LAM_BH, 1);
+    data = FIELD_DP32(data, CPUCFG2, LAMCAS, 1);
+    data = FIELD_DP32(data, CPUCFG2, LLACQ_SCREL, 1);
     env->cpucfg[2] = data;
 
     env->cpucfg[4] = 100 * 1000 * 1000; /* Crystal frequency */
