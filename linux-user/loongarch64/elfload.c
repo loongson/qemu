@@ -5,6 +5,11 @@
 #include "loader.h"
 #include "target_elf.h"
 
+uintptr_t qemu_get_guest_base(void)
+{
+        return 0x3000000;
+}
+
 
 const char *get_elf_cpu_model(uint32_t eflags)
 {

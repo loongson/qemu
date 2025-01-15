@@ -15,4 +15,6 @@ extern uintptr_t guest_base;
 
 extern bool have_guest_base;
 
+uintptr_t qemu_get_guest_base (void);
+
 #endif

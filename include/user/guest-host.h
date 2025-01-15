@@ -46,6 +46,7 @@ static inline vaddr cpu_untagged_addr_vaddr(CPUState *cs, vaddr x)
 /* All direct uses of g2h and h2g need to go away for usermode softmmu.  */
 static inline void *g2h_untagged_vaddr(vaddr x)
 {
+    guest_base = qemu_get_guest_base();
     return (void *)((uintptr_t)(x) + guest_base);
 }
 

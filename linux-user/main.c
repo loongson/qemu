@@ -96,6 +96,10 @@ static bool enable_strace;
 static int last_log_mask;
 static const char *last_log_filename;
 
+uintptr_t __attribute__((weak)) qemu_get_guest_base(void)
+{
+	return 0;
+}
 /*
  * When running 32-on-64 we should make sure we can fit all of the possible
  * guest address space into a contiguous chunk of virtual host memory.
